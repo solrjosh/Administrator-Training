@@ -346,6 +346,29 @@
               <label><input type="radio" name="featureGBRestricted" value="no" checked /> No</label>
             </div>
           </div>
+          <!-- Restricted Policy sub-fields (shown when Yes) -->
+          <div class="sub-fields hidden" id="gb-restricted-sub-fields">
+            <div class="field-group">
+              <label for="restricted-categories">Restricted Categories</label>
+              <textarea id="restricted-categories" name="restrictedCategories"
+                placeholder="Enter each restricted category on a new line, e.g.:&#10;Office Supplies / 44121500&#10;IT Equipment / 43211500&#10;Apparel / 53100000"
+                aria-describedby="restricted-categories-hint"
+                style="min-height:90px;"></textarea>
+              <span class="field-hint" id="restricted-categories-hint">
+                Replaces the "Name/UNSPSC" bullet items on Slide 31. Enter one category per line.
+              </span>
+            </div>
+            <div class="field-group">
+              <label for="restricted-messaging">Messaging Used</label>
+              <textarea id="restricted-messaging" name="restrictedMessaging"
+                placeholder="e.g. Please contact your manager before purchasing items in this category."
+                aria-describedby="restricted-messaging-hint"
+                style="min-height:70px;"></textarea>
+              <span class="field-hint" id="restricted-messaging-hint">
+                Added after "Messaging Used:" on Slide 31.
+              </span>
+            </div>
+          </div>
           <div class="toggle-row">
             <span class="toggle-label" id="label-gb-blocked">Guided Buying — Blocked Policy</span>
             <div class="radio-group" role="radiogroup" aria-labelledby="label-gb-blocked">
@@ -626,6 +649,25 @@
       map.set('(Remove for Punchout)', '');
       map.set('Remove for Punchout', '');
 
+      // Restricted Policy — Slide 31 category and messaging placeholders
+      if (s.features.gbRestricted) {
+        // Replace the three "Name/UNSPSC" bullet placeholders with the entered categories.
+        // The CSM enters one category per line; we replace each bullet in order.
+        const cats = (s.features.gbRestrictedCategories || '')
+          .split('\n')
+          .map(c => c.trim())
+          .filter(c => c.length > 0);
+        // The slide has exactly 3 Name/UNSPSC bullets — fill what's provided, blank the rest
+        map.set('Name/UNSPSC', cats[0] || '');
+        // Second and third occurrences need separate handling — done via post-processing below
+        // Store all categories for use in substituteTokens
+        map.set('__RESTRICTED_CATS__', JSON.stringify(cats));
+        // Messaging Used — append the messaging text after the label
+        if (s.features.gbRestrictedMessaging) {
+          map.set('Messaging Used:', `Messaging Used: ${s.features.gbRestrictedMessaging}`);
+        }
+      }
+
       return map;
     }
     return { buildTokenMap };
@@ -752,6 +794,7 @@
 
         // Token substitution
         for (const [token, value] of tokenMap) {
+          if (token === '__RESTRICTED_CATS__') continue; // handled separately below
           const regex = new RegExp(escapeRegex(token), 'g');
           const matches = xml.match(regex);
           const occurrences = matches ? matches.length : 0;
@@ -759,6 +802,22 @@
             xml = xml.replace(regex, escapeXml(value));
             fileSubstitutions.push({ token, replacedWith: value, occurrences });
           }
+        }
+
+        // Special handling: replace each "Name/UNSPSC" occurrence with the corresponding category
+        if (tokenMap.has('__RESTRICTED_CATS__')) {
+          try {
+            const cats = JSON.parse(tokenMap.get('__RESTRICTED_CATS__'));
+            let catIndex = 0;
+            xml = xml.replace(/Name\/UNSPSC/g, () => {
+              const replacement = cats[catIndex] || '';
+              catIndex++;
+              return escapeXml(replacement);
+            });
+            if (cats.length > 0) {
+              fileSubstitutions.push({ token: 'Name/UNSPSC', replacedWith: cats.join(', '), occurrences: Math.min(3, cats.length) });
+            }
+          } catch(e) {}
         }
 
         // Orphaned separator cleanup (two passes)
@@ -967,6 +1026,8 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
           bpoBudgetPeriodStart: document.getElementById('bpo-period-start').value,
           bpoBudgetPeriodEnd: document.getElementById('bpo-period-end').value,
           gbRestricted: document.querySelector('input[name="featureGBRestricted"]:checked')?.value === 'yes',
+          gbRestrictedCategories: document.getElementById('restricted-categories').value.trim(),
+          gbRestrictedMessaging: document.getElementById('restricted-messaging').value.trim(),
           gbBlocked: document.querySelector('input[name="featureGBBlocked"]:checked')?.value === 'yes',
           gbPreferred: document.querySelector('input[name="featureGBPreferred"]:checked')?.value === 'yes',
           gbAdditional: document.querySelector('input[name="featureGBAdditional"]:checked')?.value === 'yes',
@@ -1077,6 +1138,10 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       _toggleSubFields('boi-sub-fields', boiYes);
       _toggleSubFields('bpo-sub-fields', bpoYes);
       _toggleSubFields('bg-sub-fields', bgYes);
+
+      // Restricted Policy sub-fields
+      const gbRestrictedYes = document.querySelector('input[name="featureGBRestricted"]:checked')?.value === 'yes';
+      _toggleSubFields('gb-restricted-sub-fields', gbRestrictedYes);
     }
 
     function _toggleField(id, c)    { const e=document.getElementById(id); if(e) e.classList.toggle('visible',!!c); }
@@ -1106,6 +1171,8 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       sv('bpo-per-budget', f.bpoPerBudget); sv('bpo-per-user', f.bpoPerUser);
       sv('bpo-period-start', f.bpoBudgetPeriodStart); sv('bpo-period-end', f.bpoBudgetPeriodEnd);
       sr('featureGBRestricted', f.gbRestricted ? 'yes' : 'no');
+      sv('restricted-categories', f.gbRestrictedCategories);
+      sv('restricted-messaging',  f.gbRestrictedMessaging);
       sr('featureGBBlocked', f.gbBlocked ? 'yes' : 'no');
       sr('featureGBPreferred', f.gbPreferred ? 'yes' : 'no');
       sr('featureGBAdditional', f.gbAdditional ? 'yes' : 'no');
