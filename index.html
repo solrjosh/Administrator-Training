@@ -166,6 +166,26 @@
                   </div>
                 </div>
               </div>
+              <!-- SSO sub-fields (shown when Direct Access SSO = On) -->
+              <div class="conditional-block" id="da-sso-details-block">
+                <div class="field-group">
+                  <label for="sso-link">SSO Join Link <span style="font-weight:400;color:var(--color-text-muted);">(optional — Slide 27)</span></label>
+                  <input type="text" id="sso-link" name="ssoLink" placeholder="https://..." aria-describedby="sso-link-hint" />
+                  <span class="field-hint" id="sso-link-hint">Replaces <code>&lt;inert link&gt;</code> on Slide 27 with the customer's SSO join URL.</span>
+                </div>
+                <div class="field-group">
+                  <label for="sso-screenshot">SSO Page Screenshot <span style="font-weight:400;color:var(--color-text-muted);">(optional — Slide 27)</span></label>
+                  <div class="file-input-wrapper">
+                    <input type="file" id="sso-screenshot" name="ssoScreenshot" accept="image/png,image/jpeg,image/jpg" aria-describedby="sso-screenshot-hint" />
+                    <span class="file-name-display" id="sso-screenshot-filename" aria-live="polite"></span>
+                  </div>
+                  <span class="field-hint" id="sso-screenshot-hint">Upload a screenshot of the customer's SSO login page. Added to Slide 27 alongside the link.</span>
+                  <div id="sso-preview-wrap" style="display:none;margin-top:8px;">
+                    <img id="sso-preview" alt="SSO screenshot preview" style="max-width:280px;max-height:110px;border:1px solid var(--color-border);border-radius:var(--radius);object-fit:contain;" />
+                    <button type="button" id="sso-clear-btn" class="btn btn-ghost" style="margin-left:8px;padding:4px 10px;font-size:0.8rem;" aria-label="Remove SSO screenshot">✕ Remove</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -181,6 +201,26 @@
                   <div class="radio-group" role="radiogroup" aria-labelledby="po-sso-label">
                     <label><input type="radio" name="punchoutSso" id="po-sso-off" value="off" checked /> Off</label>
                     <label><input type="radio" name="punchoutSso" id="po-sso-on" value="on" /> On</label>
+                  </div>
+                </div>
+              </div>
+              <!-- SSO sub-fields for Punchout (shown when Punchout SSO = On) -->
+              <div class="conditional-block" id="po-sso-details-block">
+                <div class="field-group">
+                  <label for="sso-link-po">SSO Join Link <span style="font-weight:400;color:var(--color-text-muted);">(optional — Slide 27)</span></label>
+                  <input type="text" id="sso-link-po" name="ssoLinkPo" placeholder="https://..." aria-describedby="sso-link-po-hint" />
+                  <span class="field-hint" id="sso-link-po-hint">Replaces <code>&lt;inert link&gt;</code> on Slide 27 with the customer's SSO join URL.</span>
+                </div>
+                <div class="field-group">
+                  <label for="sso-screenshot-po">SSO Page Screenshot <span style="font-weight:400;color:var(--color-text-muted);">(optional — Slide 27)</span></label>
+                  <div class="file-input-wrapper">
+                    <input type="file" id="sso-screenshot-po" name="ssoScreenshotPo" accept="image/png,image/jpeg,image/jpg" aria-describedby="sso-screenshot-po-hint" />
+                    <span class="file-name-display" id="sso-screenshot-po-filename" aria-live="polite"></span>
+                  </div>
+                  <span class="field-hint" id="sso-screenshot-po-hint">Upload a screenshot of the customer's SSO login page. Added to Slide 27 alongside the link.</span>
+                  <div id="sso-po-preview-wrap" style="display:none;margin-top:8px;">
+                    <img id="sso-po-preview" alt="SSO screenshot preview" style="max-width:280px;max-height:110px;border:1px solid var(--color-border);border-radius:var(--radius);object-fit:contain;" />
+                    <button type="button" id="sso-po-clear-btn" class="btn btn-ghost" style="margin-left:8px;padding:4px 10px;font-size:0.8rem;" aria-label="Remove SSO screenshot">✕ Remove</button>
                   </div>
                 </div>
               </div>
@@ -827,6 +867,64 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
           } catch(e) { console.warn('BOI screenshot replacement failed:', e); }
         }
 
+        // Replace SSO link placeholder on Slide 27 and inject SSO screenshot if provided
+        if (formState.ssoLink || formState.ssoScreenshot) {
+          try {
+            const s27File = 'ppt/slides/slide27.xml';
+            const s27Entry = zip.file(s27File);
+            if (s27Entry) {
+              let s27Xml = await s27Entry.async('text');
+
+              // Replace <inert link> with the SSO URL (stored as &lt;inert link&gt; in XML)
+              if (formState.ssoLink) {
+                s27Xml = s27Xml.replace(/&lt;inert link&gt;/g, PptxManipulator.escapeXml(formState.ssoLink));
+                s27Xml = s27Xml.replace(/<inert link>/g, PptxManipulator.escapeXml(formState.ssoLink));
+              }
+
+              // Remove the "or Screenshot" text since we're injecting the actual screenshot
+              if (formState.ssoScreenshot) {
+                s27Xml = s27Xml.replace(/<a:p>[\s\S]*?<\/a:p>/g, para => {
+                  const pt = (para.match(/<a:t[^>]*>([^<]*)<\/a:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('');
+                  return pt.trim() === 'or Screenshot' ? '' : para;
+                });
+              }
+
+              zip.file(s27File, s27Xml);
+
+              // Add the screenshot image to the ZIP and insert a picture shape
+              if (formState.ssoScreenshot) {
+                const imgBuf = await formState.ssoScreenshot.arrayBuffer();
+                const imgExt = formState.ssoScreenshot.type === 'image/jpeg' ? 'jpg' : 'png';
+                const imgFilename = `sso_screenshot.${imgExt}`;
+                const imgPath = `ppt/media/${imgFilename}`;
+                zip.file(imgPath, imgBuf);
+
+                // Add content type if not already present
+                let ct = await zip.file('[Content_Types].xml').async('text');
+                const mimeType = imgExt === 'jpg' ? 'image/jpeg' : 'image/png';
+                if (!ct.includes(imgFilename)) {
+                  ct = ct.replace('</Types>', `<Default Extension="${imgExt}" ContentType="${mimeType}"/></Types>`);
+                  zip.file('[Content_Types].xml', ct);
+                }
+
+                // Add relationship to slide 27
+                const s27RelsPath = 'ppt/slides/_rels/slide27.xml.rels';
+                let s27Rels = await zip.file(s27RelsPath).async('text');
+                const newRId = 'rId99';
+                s27Rels = s27Rels.replace('</Relationships>',
+                  `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${imgFilename}"/></Relationships>`);
+                zip.file(s27RelsPath, s27Rels);
+
+                // Insert a picture shape into slide 27 XML before </p:spTree>
+                const picShape = `<p:pic><p:nvPicPr><p:cNvPr id="99" name="SSO Screenshot"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="${newRId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="457200" y="3200400"/><a:ext cx="4000000" cy="2400000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+                let s27XmlFinal = await zip.file(s27File).async('text');
+                s27XmlFinal = s27XmlFinal.replace('</p:spTree>', picShape + '</p:spTree>');
+                zip.file(s27File, s27XmlFinal);
+              }
+            }
+          } catch(e) { console.warn('SSO slide update failed:', e); }
+        }
+
         const pptxBlob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', compression: 'DEFLATE', compressionOptions: { level: 6 } });
         const checklistHtml = ChecklistGenerator.build(formState, removalSet, substitutions, slideManifest);
         const pptxFilename = buildFilename(formState.customerName);
@@ -854,6 +952,8 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
         eproSystem: document.getElementById('epro-system').value,
         eproSystemCustomName: document.getElementById('epro-custom-name').value.trim(),
         boiScreenshot: document.getElementById('boi-screenshot').files[0] || null,
+        ssoLink: document.getElementById('sso-link').value.trim() || document.getElementById('sso-link-po').value.trim(),
+        ssoScreenshot: document.getElementById('sso-screenshot').files[0] || document.getElementById('sso-screenshot-po').files[0] || null,
         features: {
           boi: document.querySelector('input[name="featureBOI"]:checked')?.value === 'yes',
           bpo: document.querySelector('input[name="featureBPO"]:checked')?.value === 'yes',
@@ -935,7 +1035,23 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
         bi.value=''; const prev=document.getElementById('boi-preview'), wrap=document.getElementById('boi-preview-wrap'), nm=document.getElementById('boi-screenshot-filename');
         if (prev) prev.src=''; if (wrap) wrap.style.display='none'; if (nm) nm.textContent='';
       });
-    }
+
+      // SSO screenshot previews (DA and Punchout)
+      function _wireImgPreview(inputId, previewId, wrapId, nameId, clearId) {
+        const inp = document.getElementById(inputId); if (!inp) return;
+        inp.addEventListener('change', () => {
+          const f = inp.files[0], prev = document.getElementById(previewId), wrap = document.getElementById(wrapId), nm = document.getElementById(nameId);
+          if (f) { if (nm) nm.textContent = f.name; if (prev) prev.src = URL.createObjectURL(f); if (wrap) { wrap.style.display='flex'; wrap.style.alignItems='center'; } }
+          else { if (prev) prev.src=''; if (wrap) wrap.style.display='none'; if (nm) nm.textContent=''; }
+        });
+        const clr = document.getElementById(clearId);
+        if (clr) clr.addEventListener('click', () => {
+          inp.value=''; const prev=document.getElementById(previewId), wrap=document.getElementById(wrapId), nm=document.getElementById(nameId);
+          if (prev) prev.src=''; if (wrap) wrap.style.display='none'; if (nm) nm.textContent='';
+        });
+      }
+      _wireImgPreview('sso-screenshot',    'sso-preview',    'sso-preview-wrap',    'sso-screenshot-filename',    'sso-clear-btn');
+      _wireImgPreview('sso-screenshot-po', 'sso-po-preview', 'sso-po-preview-wrap', 'sso-screenshot-po-filename', 'sso-po-clear-btn');    }
 
     function _onChange() { _updateConditionalFields(); StorageManager.save(getFormState()); }
 
@@ -949,6 +1065,12 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
 
       _toggleBlock('da-sso-block', da);
       _toggleBlock('po-sso-block', po);
+
+      // SSO sub-fields — show when SSO is ON for each ingress type
+      const daSsoOn = document.querySelector('input[name="directAccessSso"]:checked')?.value === 'on';
+      const poSsoOn = document.querySelector('input[name="punchoutSso"]:checked')?.value === 'on';
+      _toggleBlock('da-sso-details-block', da && daSsoOn);
+      _toggleBlock('po-sso-details-block', po && poSsoOn);
       _toggleField('epro-field', po);
       _toggleField('epro-custom-field', po && epro === 'Custom');
       _toggleWarning('punchout-mobile-warning', po);
