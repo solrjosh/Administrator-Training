@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Training Deck Planning Hub — Amazon Business ProServe</title>
+  <script src="jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fast-check/lib/bundle/fast-check.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-navy:      #232F3E;
+      --color-orange:    #FF9900;
+      --color-bg:        #F5F5F5;
+      --color-card:      #FFFFFF;
+      --color-border:    #D5D9D9;
+      --color-text:      #0F1111;
+      --color-text-muted:#565959;
+      --color-error:     #CC0C39;
+      --color-success:   #067D62;
+      --color-warning:   #8A6116;
+      --color-warning-bg:#FFF8E7;
+      --radius:          4px;
+      --font:            'Amazon Ember', Arial, sans-serif;
+    }
+    body { font-family: var(--font); background: var(--color-bg); color: var(--color-text); min-width: 1024px; line-height: 1.5; }
+    .hub-header { background: var(--color-navy); color: #fff; padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+    .hub-header .logo-dot { width: 32px; height: 32px; background: var(--color-orange); border-radius: 50%; flex-shrink: 0; }
+    .hub-header h1 { font-size: 1.25rem; font-weight: 700; }
+    .hub-header p  { font-size: 0.85rem; opacity: 0.75; }
+    .hub-main { max-width: 900px; margin: 24px auto; padding: 0 24px 48px; }
+    .form-section { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; }
+    .form-section__header { background: var(--color-navy); color: #fff; padding: 10px 16px; font-size: 0.9rem; font-weight: 700; letter-spacing: 0.02em; }
+    .form-section__body { padding: 20px 16px; display: flex; flex-direction: column; gap: 14px; }
+    .field-group { display: flex; flex-direction: column; gap: 4px; }
+    .field-group label { font-size: 0.875rem; font-weight: 600; color: var(--color-text); }
+    .field-group label .required-star { color: var(--color-error); margin-left: 2px; }
+    .field-group input[type="text"], .field-group input[type="date"], .field-group select, .field-group textarea {
+      border: 1px solid var(--color-border); border-radius: var(--radius); padding: 8px 10px;
+      font-family: var(--font); font-size: 0.875rem; color: var(--color-text); background: #fff; width: 100%; transition: border-color 0.15s;
+    }
+    .field-group input:focus, .field-group select:focus, .field-group textarea:focus {
+      outline: 2px solid var(--color-orange); outline-offset: 1px; border-color: var(--color-orange);
+    }
+    .field-group textarea { resize: vertical; min-height: 80px; }
+    .field-hint { font-size: 0.8rem; color: var(--color-text-muted); }
+    .file-input-wrapper { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .file-input-wrapper input[type="file"] { font-family: var(--font); font-size: 0.875rem; }
+    .file-name-display { font-size: 0.8rem; color: var(--color-text-muted); font-style: italic; }
+    .toggle-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .toggle-row .toggle-label { font-size: 0.875rem; font-weight: 600; min-width: 240px; }
+    .radio-group { display: flex; gap: 16px; }
+    .radio-group label { display: flex; align-items: center; gap: 5px; font-size: 0.875rem; font-weight: 400; cursor: pointer; }
+    .radio-group input[type="radio"] { accent-color: var(--color-orange); width: 16px; height: 16px; cursor: pointer; }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; }
+    .checkbox-row input[type="checkbox"] { accent-color: var(--color-orange); width: 16px; height: 16px; cursor: pointer; }
+    .checkbox-row label { font-size: 0.875rem; cursor: pointer; }
+    .ingress-row { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    .ingress-check-label { display: flex; align-items: center; gap: 6px; font-size: 0.875rem; font-weight: 600; min-width: 160px; cursor: pointer; }
+    .ingress-row input[type="checkbox"] { accent-color: var(--color-orange); width: 16px; height: 16px; cursor: pointer; }
+    .ingress-sub-fields { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 300px; }
+    .sso-row { display: flex; align-items: center; gap: 10px; }
+    .sso-label { font-size: 0.875rem; font-weight: 600; min-width: 60px; }
+    .conditional-field { display: none; }
+    .conditional-field.visible { display: flex; flex-direction: column; gap: 4px; }
+    .conditional-block { display: none; }
+    .conditional-block.visible { display: block; }
+    .inline-warning { background: var(--color-warning-bg); border-left: 4px solid #F0A500; border-radius: var(--radius); padding: 10px 14px; font-size: 0.85rem; color: var(--color-warning); display: none; }
+    .inline-warning.visible { display: block; }
+    .validation-summary { background: #FFF0F0; border: 1px solid var(--color-error); border-left: 4px solid var(--color-error); border-radius: var(--radius); padding: 14px 16px; display: none; }
+    .validation-summary.visible { display: block; }
+    .validation-summary h3 { font-size: 0.9rem; color: var(--color-error); margin-bottom: 8px; }
+    .validation-summary ul { list-style: disc; padding-left: 20px; font-size: 0.875rem; color: var(--color-error); }
+    .restore-banner { background: #EAF4FB; border: 1px solid #A8D5F0; border-radius: var(--radius); padding: 10px 14px; font-size: 0.85rem; color: #0A5C8A; display: none; margin-bottom: 12px; }
+    .restore-banner.visible { display: block; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border: none; border-radius: var(--radius); font-family: var(--font); font-size: 0.875rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s, background 0.15s; text-decoration: none; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--color-orange); color: var(--color-navy); }
+    .btn-primary:hover:not(:disabled) { background: #E68A00; }
+    .btn-secondary { background: var(--color-navy); color: #fff; }
+    .btn-secondary:hover:not(:disabled) { background: #1A2530; }
+    .btn-ghost { background: transparent; color: var(--color-text-muted); border: 1px solid var(--color-border); }
+    .btn-ghost:hover:not(:disabled) { background: var(--color-bg); }
+    .form-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+    .results-section { display: none; margin-top: 24px; }
+    .results-section.visible { display: block; }
+    .results-header { background: var(--color-success); color: #fff; padding: 12px 16px; border-radius: var(--radius) var(--radius) 0 0; font-weight: 700; font-size: 0.95rem; }
+    .results-body { background: var(--color-card); border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); padding: 20px 16px; }
+    .results-downloads { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .checklist-container { border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+    .checklist-container iframe { width: 100%; min-height: 500px; border: none; display: block; }
+    .error-banner { background: #FFF0F0; border-left: 4px solid var(--color-error); border-radius: var(--radius); padding: 14px 16px; display: none; margin-top: 16px; }
+    .error-banner.visible { display: block; }
+    .error-banner strong { color: var(--color-error); font-size: 0.9rem; }
+    .error-banner p { font-size: 0.85rem; color: var(--color-text); margin-top: 4px; }
+    .error-detail { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 8px; font-family: monospace; background: #f8f8f8; padding: 6px 8px; border-radius: 2px; display: none; }
+    .error-detail.visible { display: block; }
+    .error-toggle { font-size: 0.8rem; color: var(--color-text-muted); cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; margin-top: 4px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(35,47,62,0.3); border-top-color: var(--color-navy); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .sub-fields { padding-left: 20px; border-left: 3px solid var(--color-orange); display: flex; flex-direction: column; gap: 10px; }
+    .sub-fields.hidden { display: none; }
+    .date-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .date-row .field-group { flex: 1; min-width: 160px; }
+  </style>
+</head>
+<body>
+
+  <header class="hub-header" role="banner">
+    <div class="logo-dot" aria-hidden="true"></div>
+    <div>
+      <h1>Administrator Training Deck Planning Hub</h1>
+      <p>Amazon Business ProServe — Administrator Training Deck Generator</p>
+    </div>
+  </header>
+
+  <main class="hub-main" id="main-content">
+    <div class="restore-banner" id="restore-banner" role="status" aria-live="polite">Form restored from your last session.</div>
+
+    <form id="hub-form" novalidate aria-label="Admin Training Deck Configuration Form">
+
+      <!-- ── Section 1: Source Deck ── -->
+      <section class="form-section" aria-labelledby="s1-heading">
+        <div class="form-section__header" id="s1-heading">1. Source Deck</div>
+        <div class="form-section__body">
+          <div class="field-group">
+            <label for="source-deck-file">Source Deck PPTX <span class="required-star" aria-hidden="true">*</span></label>
+            <div class="file-input-wrapper">
+              <input type="file" id="source-deck-file" name="sourceDeckFile" accept=".pptx" aria-required="true" aria-describedby="source-deck-hint" />
+              <span class="file-name-display" id="source-deck-filename" aria-live="polite"></span>
+            </div>
+            <span class="field-hint" id="source-deck-hint">Select <code>Administrator Training_December2025.pptx</code> from your local machine. This file is never uploaded or modified.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Section 2: Customer Details ── -->
+      <section class="form-section" aria-labelledby="s2-heading">
+        <div class="form-section__header" id="s2-heading">2. Customer Details</div>
+        <div class="form-section__body">
+          <div class="field-group">
+            <label for="customer-name">Customer Name <span class="required-star" aria-hidden="true">*</span></label>
+            <input type="text" id="customer-name" name="customerName" placeholder="e.g. Acme Corporation" aria-required="true" autocomplete="organization" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Section 3: Ingress Configuration ── -->
+      <section class="form-section" aria-labelledby="s3-heading">
+        <div class="form-section__header" id="s3-heading">3. Ingress Configuration</div>
+        <div class="form-section__body">
+          <p class="field-hint" id="ingress-required-hint">Select at least one ingress type. <span class="required-star" aria-hidden="true">*</span></p>
+
+          <!-- Direct Access -->
+          <div class="ingress-row">
+            <label class="ingress-check-label" for="ingress-direct-access">
+              <input type="checkbox" id="ingress-direct-access" name="ingressDirectAccess" aria-describedby="ingress-required-hint" /> Direct Access
+            </label>
+            <div class="ingress-sub-fields" aria-live="polite">
+              <div class="conditional-block" id="da-sso-block">
+                <div class="sso-row">
+                  <span class="sso-label" id="da-sso-label">SSO:</span>
+                  <div class="radio-group" role="radiogroup" aria-labelledby="da-sso-label">
+                    <label><input type="radio" name="directAccessSso" id="da-sso-off" value="off" checked /> Off</label>
+                    <label><input type="radio" name="directAccessSso" id="da-sso-on" value="on" /> On</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Punchout -->
+          <div class="ingress-row">
+            <label class="ingress-check-label" for="ingress-punchout">
+              <input type="checkbox" id="ingress-punchout" name="ingressPunchout" aria-describedby="ingress-required-hint" /> Punchout
+            </label>
+            <div class="ingress-sub-fields" aria-live="polite">
+              <div class="conditional-block" id="po-sso-block">
+                <div class="sso-row">
+                  <span class="sso-label" id="po-sso-label">SSO:</span>
+                  <div class="radio-group" role="radiogroup" aria-labelledby="po-sso-label">
+                    <label><input type="radio" name="punchoutSso" id="po-sso-off" value="off" checked /> Off</label>
+                    <label><input type="radio" name="punchoutSso" id="po-sso-on" value="on" /> On</label>
+                  </div>
+                </div>
+              </div>
+              <div class="conditional-field" id="epro-field">
+                <label for="epro-system">eProcurement System <span class="required-star" aria-hidden="true">*</span></label>
+                <select id="epro-system" name="eproSystem" aria-required="true">
+                  <option value="">— Select —</option>
+                  <option value="Coupa">Coupa</option>
+                  <option value="Ariba">Ariba</option>
+                  <option value="Custom">Custom / Other</option>
+                </select>
+              </div>
+              <div class="conditional-field" id="epro-custom-field">
+                <label for="epro-custom-name">Custom eProcurement System Name <span class="required-star" aria-hidden="true">*</span></label>
+                <input type="text" id="epro-custom-name" name="eproSystemCustomName" placeholder="e.g. SAP Ariba, Oracle iProcurement" aria-required="true" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile App warning for Punchout -->
+          <div class="inline-warning" id="punchout-mobile-warning" role="alert">
+            ⚠️ <strong>Note:</strong> Mobile App slides will be removed since the Amazon Business mobile app does not work with Punchout.
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Section 4: Feature Toggles ── -->
+      <section class="form-section" aria-labelledby="s4-heading">
+        <div class="form-section__header" id="s4-heading">4. Feature Toggles</div>
+        <div class="form-section__body">
+
+          <!-- Business Order Information (BOI) -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-boi">Business Order Information (BOI)</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-boi">
+              <label><input type="radio" name="featureBOI" id="boi-yes" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureBOI" id="boi-no" value="no" checked /> No</label>
+            </div>
+          </div>
+          <div class="sub-fields hidden" id="boi-sub-fields">
+            <div class="field-group">
+              <label for="boi-screenshot">BOI Settings Screenshot <span style="font-weight:400;color:var(--color-text-muted);">(optional — Slide 13)</span></label>
+              <div class="file-input-wrapper">
+                <input type="file" id="boi-screenshot" name="boiScreenshot" accept="image/png,image/jpeg,image/jpg" aria-describedby="boi-screenshot-hint" />
+                <span class="file-name-display" id="boi-screenshot-filename" aria-live="polite"></span>
+              </div>
+              <span class="field-hint" id="boi-screenshot-hint">Upload a screenshot of the customer's BOI settings page. Replaces the placeholder image on Slide 13.</span>
+              <div id="boi-preview-wrap" style="display:none;margin-top:8px;">
+                <img id="boi-preview" alt="BOI screenshot preview" style="max-width:320px;max-height:120px;border:1px solid var(--color-border);border-radius:var(--radius);object-fit:contain;" />
+                <button type="button" id="boi-clear-btn" class="btn btn-ghost" style="margin-left:8px;padding:4px 10px;font-size:0.8rem;" aria-label="Remove BOI screenshot">✕ Remove</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blanket Purchase Orders (BPO) -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-bpo">Blanket Purchase Orders (BPO)</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-bpo">
+              <label><input type="radio" name="featureBPO" id="bpo-yes" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureBPO" id="bpo-no" value="no" checked /> No</label>
+            </div>
+          </div>
+          <div class="sub-fields hidden" id="bpo-sub-fields">
+            <!-- BPO sub-toggles -->
+            <div class="toggle-row">
+              <span class="toggle-label" id="label-bpo-recurring">Recurring Budgets (Slide 15)</span>
+              <div class="radio-group" role="radiogroup" aria-labelledby="label-bpo-recurring">
+                <label><input type="radio" name="featureBPORecurring" value="yes" checked /> Yes</label>
+                <label><input type="radio" name="featureBPORecurring" value="no" /> No</label>
+              </div>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-label" id="label-bpo-individual">Individual Allocation (Slide 16)</span>
+              <div class="radio-group" role="radiogroup" aria-labelledby="label-bpo-individual">
+                <label><input type="radio" name="featureBPOIndividual" value="yes" checked /> Yes</label>
+                <label><input type="radio" name="featureBPOIndividual" value="no" /> No</label>
+              </div>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-label" id="label-bpo-approvals">Approval Workflow Integration (Slide 17)</span>
+              <div class="radio-group" role="radiogroup" aria-labelledby="label-bpo-approvals">
+                <label><input type="radio" name="featureBPOApprovals" value="yes" checked /> Yes</label>
+                <label><input type="radio" name="featureBPOApprovals" value="no" /> No</label>
+              </div>
+            </div>
+            <!-- BPO settings values for Slide 18 -->
+            <p class="field-hint" style="margin-top:4px;">BPO Settings (Slide 18) — fill in to populate the slide:</p>
+            <div class="date-row">
+              <div class="field-group">
+                <label for="bpo-num-budgets">Number of Budgets</label>
+                <input type="text" id="bpo-num-budgets" name="bpoNumBudgets" placeholder="e.g. 3" />
+              </div>
+              <div class="field-group">
+                <label for="bpo-num-groups">Number of Groups</label>
+                <input type="text" id="bpo-num-groups" name="bpoNumGroups" placeholder="e.g. 5" />
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="bpo-per-budget">Amount per Budget</label>
+              <input type="text" id="bpo-per-budget" name="bpoPerBudget" placeholder="e.g. $10,000" />
+            </div>
+            <div class="field-group">
+              <label for="bpo-per-user">Amount per User Allocation</label>
+              <input type="text" id="bpo-per-user" name="bpoPerUser" placeholder="e.g. $500" />
+            </div>
+            <div class="date-row">
+              <div class="field-group">
+                <label for="bpo-period-start">Budget Start Date</label>
+                <input type="date" id="bpo-period-start" name="bpoBudgetPeriodStart" />
+              </div>
+              <div class="field-group">
+                <label for="bpo-period-end">Budget End Date</label>
+                <input type="date" id="bpo-period-end" name="bpoBudgetPeriodEnd" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Guided Buying Policies -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-gb-restricted">Guided Buying — Restricted Policy</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-gb-restricted">
+              <label><input type="radio" name="featureGBRestricted" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureGBRestricted" value="no" checked /> No</label>
+            </div>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-gb-blocked">Guided Buying — Blocked Policy</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-gb-blocked">
+              <label><input type="radio" name="featureGBBlocked" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureGBBlocked" value="no" checked /> No</label>
+            </div>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-gb-preferred">Guided Buying — Preferred Products/Sellers</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-gb-preferred">
+              <label><input type="radio" name="featureGBPreferred" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureGBPreferred" value="no" checked /> No</label>
+            </div>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-gb-additional">Guided Buying — Additional Preferences</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-gb-additional">
+              <label><input type="radio" name="featureGBAdditional" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureGBAdditional" value="no" checked /> No</label>
+            </div>
+          </div>
+
+          <!-- Tax Exemptions -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-tax">Tax Exemptions</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-tax">
+              <label><input type="radio" name="featureTax" value="yes" checked /> Yes</label>
+              <label><input type="radio" name="featureTax" value="no" /> No</label>
+            </div>
+          </div>
+
+          <!-- Debarment Policies -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-debarment">Debarment Policies</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-debarment">
+              <label><input type="radio" name="featureDebarment" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureDebarment" value="no" checked /> No</label>
+            </div>
+          </div>
+
+          <!-- Certifications -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-certifications">Certifications</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-certifications">
+              <label><input type="radio" name="featureCertifications" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureCertifications" value="no" checked /> No</label>
+            </div>
+          </div>
+
+          <!-- Approvals -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-approvals">Approvals</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-approvals">
+              <label><input type="radio" name="featureApprovals" id="approvals-yes" value="yes" checked /> Yes</label>
+              <label><input type="radio" name="featureApprovals" id="approvals-no" value="no" /> No</label>
+            </div>
+          </div>
+
+          <!-- Business Giving -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-bg">Business Giving</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-bg">
+              <label><input type="radio" name="featureBusinessGiving" id="bg-yes" value="yes" /> Yes</label>
+              <label><input type="radio" name="featureBusinessGiving" id="bg-no" value="no" checked /> No</label>
+            </div>
+          </div>
+          <div class="sub-fields hidden" id="bg-sub-fields">
+            <div class="toggle-row">
+              <span class="toggle-label" id="label-bg-internal">Internal Campaigns (Slides 49–50)</span>
+              <div class="radio-group" role="radiogroup" aria-labelledby="label-bg-internal">
+                <label><input type="radio" name="featureBGInternal" value="yes" /> Yes</label>
+                <label><input type="radio" name="featureBGInternal" value="no" checked /> No</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3-Way Match -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-3wm">3-Way Match / Receiving</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-3wm">
+              <label><input type="radio" name="feature3WM" value="yes" checked /> Yes</label>
+              <label><input type="radio" name="feature3WM" value="no" /> No</label>
+            </div>
+          </div>
+
+          <!-- Mobile App -->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-mobile">Amazon Business Mobile App</span>
+            <div class="radio-group" role="radiogroup" aria-labelledby="label-mobile">
+              <label><input type="radio" name="featureMobileApp" value="yes" checked /> Yes</label>
+              <label><input type="radio" name="featureMobileApp" value="no" /> No</label>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ── Section 5: Customer Resources ── -->
+      <section class="form-section" aria-labelledby="s5-heading">
+        <div class="form-section__header" id="s5-heading">5. Customer Resources</div>
+        <div class="form-section__body">
+          <div class="field-group">
+            <label for="customer-resource-links">Resource Links (Slide 66)</label>
+            <textarea id="customer-resource-links" name="customerResourceLinks" placeholder="Paste customer-specific resource links here (one per line)" aria-describedby="resources-hint"></textarea>
+            <span class="field-hint" id="resources-hint">Replaces resource link placeholders on Slide 66.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Section 6: Output Options ── -->
+      <section class="form-section" aria-labelledby="s6-heading">
+        <div class="form-section__header" id="s6-heading">6. Output Options</div>
+        <div class="form-section__body">
+          <div class="checkbox-row">
+            <input type="checkbox" id="generate-preview-guide" name="generatePreviewGuide" />
+            <label for="generate-preview-guide">Generate HTML Preview Guide <span class="field-hint" style="font-weight:400;margin-left:6px;">(optional)</span></label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Validation Summary -->
+      <div class="validation-summary" id="validation-summary" role="alert" aria-live="assertive" aria-atomic="true" tabindex="-1">
+        <h3>⚠ Please fix the following before generating:</h3>
+        <ul id="validation-error-list"></ul>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" id="clear-form-btn" aria-label="Clear all form data">🗑 Clear Form</button>
+        <button type="button" class="btn btn-primary" id="generate-btn" aria-label="Generate customized admin training deck">⚡ Generate Deck</button>
+      </div>
+    </form>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="error-banner" role="alert" aria-live="assertive">
+      <strong id="error-banner-title">An error occurred</strong>
+      <p id="error-banner-message"></p>
+      <button class="error-toggle" id="error-detail-toggle" aria-expanded="false" aria-controls="error-detail-text">Show technical details</button>
+      <div class="error-detail" id="error-detail-text" role="region" aria-label="Technical error details"></div>
+    </div>
+
+    <!-- Results Section -->
+    <section class="results-section" id="results-section" aria-labelledby="results-heading" aria-live="polite">
+      <div class="results-header" id="results-heading">✅ Deck generated successfully</div>
+      <div class="results-body">
+        <div class="results-downloads" id="results-downloads">
+          <button type="button" class="btn btn-secondary" id="download-pptx-btn">⬇ Download PPTX</button>
+          <button type="button" class="btn btn-secondary" id="download-checklist-btn">⬇ Download Checklist</button>
+          <button type="button" class="btn btn-secondary" id="download-preview-btn" style="display:none;">⬇ Download Preview Guide</button>
+        </div>
+        <div class="checklist-container" id="checklist-container"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  'use strict';
+
+  const STORAGE_KEY = 'admin-deck-hub-state';
+  const TOTAL_SLIDES = 68;
+
+  // ── Slide Filter Rules ──────────────────────────────────────────────────────
+  // condition(s) = true → remove these slides
+  const SLIDE_FILTER_RULES = [
+
+    // Punchout only — remove Direct Access checkout slide (none specific in admin deck)
+    // Direct Access only — remove Punchout setup slide
+    { slides: [4], condition: s => !s.ingressPunchout, reason: 'Punchout not selected — Punchout setup slide not applicable' },
+
+    // Mobile App — remove if Punchout selected (app doesn't work with Punchout)
+    // or if Mobile App feature is off
+    { slides: [26, 43], condition: s => s.ingressPunchout || !s.features.mobileApp, reason: 'Mobile App not applicable (Punchout selected or Mobile App not in scope)' },
+
+    // SSO — remove if SSO not in use
+    { slides: [27], condition: s => {
+        const ssoInUse = (s.ingressDirectAccess && s.directAccessSso) || (s.ingressPunchout && s.punchoutSso);
+        return !ssoInUse;
+      }, reason: 'SSO not in scope' },
+
+    // BOI — remove if not in scope
+    { slides: [12, 13], condition: s => !s.features.boi, reason: 'Feature not in scope: Business Order Information' },
+
+    // BPO — remove all BPO slides if not in scope
+    { slides: [14, 15, 16, 17, 18], condition: s => !s.features.bpo, reason: 'Feature not in scope: Blanket Purchase Orders' },
+    // BPO sub-slides — remove individually if sub-toggle is off (only when BPO is on)
+    { slides: [15], condition: s => s.features.bpo && !s.features.bpoRecurring, reason: 'BPO Recurring Budgets not in scope' },
+    { slides: [16], condition: s => s.features.bpo && !s.features.bpoIndividual, reason: 'BPO Individual Allocation not in scope' },
+    { slides: [17], condition: s => s.features.bpo && !s.features.bpoApprovals, reason: 'BPO Approval Workflow Integration not in scope' },
+
+    // Guided Buying — individual toggles
+    { slides: [31], condition: s => !s.features.gbRestricted, reason: 'Feature not in scope: Guided Buying Restricted Policy' },
+    { slides: [32], condition: s => !s.features.gbBlocked, reason: 'Feature not in scope: Guided Buying Blocked Policy' },
+    { slides: [33], condition: s => !s.features.gbPreferred, reason: 'Feature not in scope: Guided Buying Preferred Products/Sellers' },
+    { slides: [34], condition: s => !s.features.gbAdditional, reason: 'Feature not in scope: Guided Buying Additional Preferences' },
+
+    // Tax Exemptions
+    { slides: [36], condition: s => !s.features.taxExemptions, reason: 'Feature not in scope: Tax Exemptions' },
+
+    // Debarment Policies
+    { slides: [37], condition: s => !s.features.debarment, reason: 'Feature not in scope: Debarment Policies' },
+
+    // Certifications
+    { slides: [38], condition: s => !s.features.certifications, reason: 'Feature not in scope: Certifications' },
+
+    // Approvals — remove all approval slides if not in scope
+    { slides: [39, 40, 41, 42, 43], condition: s => !s.features.approvals, reason: 'Feature not in scope: Approvals' },
+
+    // Business Giving — remove all BG slides if not in scope
+    { slides: [44, 45, 46, 47, 48, 49, 50], condition: s => !s.features.businessGiving, reason: 'Feature not in scope: Business Giving' },
+    // Internal Campaigns sub-toggle (only when BG is on)
+    { slides: [49, 50], condition: s => s.features.businessGiving && !s.features.bgInternal, reason: 'Internal Campaigns not in scope' },
+
+    // 3-Way Match — remove all 3WM slides if not in scope
+    { slides: [51, 52, 53, 54, 55, 56, 57], condition: s => !s.features.threeWayMatch, reason: 'Feature not in scope: 3-Way Match / Receiving' },
+    // 3WM mobile barcode scanning — remove if Punchout (mobile app not compatible)
+    { slides: [52, 53, 54, 55, 56], condition: s => s.features.threeWayMatch && s.ingressPunchout, reason: 'Mobile barcode scanning not applicable for Punchout' },
+
+  ];
+
+  // ── SlideFilterEngine ────────────────────────────────────────────────────────
+  const SlideFilterEngine = (() => {
+    function computeRemovals(formState) {
+      const removalSet = new Set();
+      for (const rule of SLIDE_FILTER_RULES) {
+        if (rule.condition(formState)) {
+          for (const n of rule.slides) removalSet.add(n);
+        }
+      }
+      return removalSet;
+    }
+    return { computeRemovals };
+  })();
+
+  // ── PlaceholderEngine ────────────────────────────────────────────────────────
+  const PlaceholderEngine = (() => {
+    function buildTokenMap(formState) {
+      const map = new Map();
+      const s = formState;
+
+      // Customer name — deck uses {{ Customer }} (with spaces) and [CUSTOMER]
+      if (s.customerName) {
+        map.set('{{ Customer }}', s.customerName);
+        map.set('{{Customer}}', s.customerName);
+        map.set('{{CUSTOMER}}', s.customerName);
+        map.set('[CUSTOMER]', s.customerName);
+      }
+
+      // Remove internal-only markers
+      map.set('[INTERNAL CAMPAIGNS ONLY]', '');
+
+      // BPO slide 18 literal text replacement
+      if (s.features.bpo) {
+        const nb = s.features.bpoNumBudgets || 'XX';
+        const ng = s.features.bpoNumGroups  || 'XX';
+        const pb = s.features.bpoPerBudget  || '$$';
+        const pu = s.features.bpoPerUser    || '$$';
+        const fmtDate = (val) => {
+          if (!val) return 'XX/XX/XXXX';
+          const d = new Date(val + 'T00:00:00');
+          return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
+        };
+        map.set('XX Budgets for XX Groups', `${nb} Budgets for ${ng} Groups`);
+        map.set('$$ per budget',            `${pb} per budget`);
+        map.set('$$ per user allocation',   `${pu} per user allocation`);
+        map.set('Budget good from XX/XX/XXXX to XX/XX/XXXX',
+                `Budget good from ${fmtDate(s.features.bpoBudgetPeriodStart)} to ${fmtDate(s.features.bpoBudgetPeriodEnd)}`);
+      }
+
+      // Remove DO & DELETE authoring notes
+      map.set('DO & DELETE: REPLACE WITH IMAGE OF CUSTOMER\'S HOME PAGE IF NOT BUSINESS PRIME', '');
+      map.set('DO & DELETE: REPLACE WITH SCREENSHOT FROM CUSTOMER ACCOUNT', '');
+      map.set('DO & DELETE: CONSIDER USING SCREENSHOT FROM CUSTOMER\'S ACCOUNT TO SHOW RELEVANT PRODUCT', '');
+      map.set('DO & DELETE: If customer is using IDP initiated adjust 1', '');
+      map.set('DO & DELETE: SUPPLY SCREENSHOT FROM CUSTOMER ACCOUNT / SPEND VISIBILITY', '');
+      map.set('DELETE: IF NOT IN SCOPE', '');
+      map.set('DELETE IF NOT IN SCOPE', '');
+      map.set('DELETE IF NOT IN SCOPE | Admin must login and allocate funds to each user after they join – DELETE IF NO INDIVIDUAL ALLOCATION', '');
+      map.set('(Remove for Punchout)', '');
+      map.set('Remove for Punchout', '');
+
+      return map;
+    }
+    return { buildTokenMap };
+  })();
+
+  // ── StorageManager ───────────────────────────────────────────────────────────
+  const StorageManager = (() => {
+    let _t = null;
+    function save(fs) {
+      clearTimeout(_t);
+      _t = setTimeout(() => {
+        try { const { sourceDeckFile, boiScreenshot, ...p } = fs; localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch(e) {}
+      }, 300);
+    }
+    function load() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch(e) { return null; } }
+    function clear() { try { localStorage.removeItem(STORAGE_KEY); } catch(e) {} }
+    return { save, load, clear };
+  })();
+
+  // ── DownloadHelper ───────────────────────────────────────────────────────────
+  const DownloadHelper = (() => {
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.style.display = 'none';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function downloadHtml(html, filename) { downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), filename); }
+    return { downloadBlob, downloadHtml };
+  })();
+
+  // ── PptxManipulator ──────────────────────────────────────────────────────────
+  const PptxManipulator = (() => {
+    function escapeXml(v) { return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;'); }
+    function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+    function extractSlideTitle(xml) {
+      const spPat = /<p:sp[\s\S]*?<\/p:sp>/g; let m;
+      while ((m = spPat.exec(xml)) !== null) {
+        if (/<p:ph[^>]+type="(?:title|ctrTitle)"/.test(m[0])) {
+          const runs = []; const ap = /<a:t[^>]*>([\s\S]*?)<\/a:t>/g; let am;
+          while ((am = ap.exec(m[0])) !== null) runs.push(am[1]);
+          const t = runs.join('').trim(); if (t) return t;
+        }
+      }
+      return '';
+    }
+    function getRuleReason(n) {
+      for (const r of SLIDE_FILTER_RULES) { if (r.slides.includes(n)) return r.reason; }
+      return null;
+    }
+
+    async function removeSlides(zip, removalSet) {
+      const presXmlText = await zip.file('ppt/presentation.xml').async('text');
+      const orderedRIds = [];
+      const sldIdPat = /<p:sldId[^>]+r:id="([^"]+)"/g; let sm;
+      while ((sm = sldIdPat.exec(presXmlText)) !== null) orderedRIds.push(sm[1]);
+
+      const relsText = await zip.file('ppt/_rels/presentation.xml.rels').async('text');
+      const rIdToFile = {};
+      const relPat = /<Relationship[^>]+Id="([^"]+)"[^>]+Type="[^"]*\/slide"[^>]+Target="([^"]+)"[^>]*\/?>/g; let rm;
+      while ((rm = relPat.exec(relsText)) !== null) {
+        let t = rm[2]; if (t.startsWith('../')) t = 'ppt/' + t.slice(3); else if (!t.startsWith('ppt/')) t = 'ppt/' + t;
+        rIdToFile[rm[1]] = t;
+      }
+      const orderedSlideFiles = orderedRIds.map(r => rIdToFile[r]).filter(Boolean);
+
+      let presXml = presXmlText, presRelsXml = relsText;
+      let contentTypesXml = await zip.file('[Content_Types].xml').async('text');
+
+      for (const n of removalSet) {
+        const sf = orderedSlideFiles[n - 1]; if (!sf) continue;
+        zip.remove(sf);
+        const srp = sf.replace(/ppt\/slides\/([^/]+)$/, 'ppt/slides/_rels/$1.rels');
+        if (zip.file(srp)) zip.remove(srp);
+        const rId = orderedRIds[n - 1];
+        if (rId) {
+          presXml = presXml.replace(new RegExp(`\\s*<p:sldId[^>]+r:id="${escapeRegex(rId)}"[^>]*/?>`, 'g'), '');
+          presRelsXml = presRelsXml.replace(new RegExp(`\\s*<Relationship[^>]+Id="${escapeRegex(rId)}"[^>]*/?>`, 'g'), '');
+        }
+        contentTypesXml = contentTypesXml.replace(new RegExp(`\\s*<Override[^>]+PartName="${escapeRegex('/'+sf)}"[^>]*/?>`, 'g'), '');
+      }
+      zip.file('ppt/presentation.xml', presXml);
+      zip.file('ppt/_rels/presentation.xml.rels', presRelsXml);
+      zip.file('[Content_Types].xml', contentTypesXml);
+
+      let outNum = 0;
+      const manifest = [];
+      for (let i = 0; i < orderedSlideFiles.length; i++) {
+        const n = i + 1, sf = orderedSlideFiles[i], removed = removalSet.has(n);
+        let title = '';
+        if (!removed && sf && zip.file(sf)) {
+          try { title = extractSlideTitle(await zip.file(sf).async('text')); } catch(_) {}
+        }
+        if (!title) title = `Slide ${n}`;
+        manifest.push({ originalNumber: n, outputNumber: removed ? null : ++outNum, slideFile: sf, title, removed, removalReason: removed ? getRuleReason(n) : null, isManualTask: false, substitutions: [], unfilledPlaceholders: [] });
+      }
+      return manifest;
+    }
+
+    async function substituteTokens(zip, tokenMap, retainedSlideFiles, formState) {
+      const PLACEHOLDER_PATTERN = /\{\{[^}]+\}\}/g;
+      const results = [];
+
+      // Paragraph-level removal for conditional bullets
+      const removeParagraphsContaining = [];
+      const ssoInUse = formState && ((formState.ingressDirectAccess && formState.directAccessSso) || (formState.ingressPunchout && formState.punchoutSso));
+      if (!ssoInUse) removeParagraphsContaining.push('[For SSO]');
+
+      for (const filePath of retainedSlideFiles) {
+        const zipEntry = zip.file(filePath); if (!zipEntry) continue;
+        let xml = await zipEntry.async('text');
+        const fileSubstitutions = [];
+
+        // Remove yellow label shapes (FFFF00)
+        xml = xml.replace(/<p:sp>[\s\S]*?<\/p:sp>/g, shape => shape.includes('FFFF00') ? '' : shape);
+
+        // Paragraph-level removal
+        for (const marker of removeParagraphsContaining) {
+          xml = xml.replace(/<a:p>[\s\S]*?<\/a:p>/g, para => {
+            const pt = (para.match(/<a:t[^>]*>([^<]*)<\/a:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('');
+            return pt.includes(marker) ? '' : para;
+          });
+        }
+
+        // Token substitution
+        for (const [token, value] of tokenMap) {
+          const regex = new RegExp(escapeRegex(token), 'g');
+          const matches = xml.match(regex);
+          const occurrences = matches ? matches.length : 0;
+          if (occurrences > 0) {
+            xml = xml.replace(regex, escapeXml(value));
+            fileSubstitutions.push({ token, replacedWith: value, occurrences });
+          }
+        }
+
+        // Orphaned separator cleanup (two passes)
+        for (let pass = 0; pass < 2; pass++) {
+          xml = xml.replace(/(<a:t[^>]*>)([\s\S]*?)(<\/a:t>)/g, (m, o, text, c) => {
+            let cl = text.replace(/^\s*\/\s*/g,'').replace(/\s*\/\s*$/g,'').replace(/  +/g,' ').trim();
+            return o + cl + c;
+          });
+        }
+
+        const remaining = xml.match(PLACEHOLDER_PATTERN) || [];
+        zip.file(filePath, xml);
+        results.push({ filePath, substitutions: fileSubstitutions, unfilledPlaceholders: [...new Set(remaining)] });
+      }
+      return results;
+    }
+
+    return { removeSlides, substituteTokens, escapeXml };
+  })();
+
+  // ── ChecklistGenerator ───────────────────────────────────────────────────────
+  const ChecklistGenerator = (() => {
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function fmtDate(d) { const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+
+    function build(formState, removalSet, substitutions, slideManifest) {
+      const subMap = new Map();
+      for (const r of (substitutions||[])) subMap.set(r.filePath, r);
+      const manifest = slideManifest.map(s => {
+        const sub = subMap.get(s.slideFile);
+        return Object.assign({}, s, {
+          substitutions: sub?.substitutions || s.substitutions || [],
+          unfilledPlaceholders: sub?.unfilledPlaceholders || s.unfilledPlaceholders || []
+        });
+      });
+      const included = manifest.filter(s => !s.removed);
+      const removed  = manifest.filter(s => s.removed);
+      const customerName = formState?.customerName || 'Customer';
+      const genDate = fmtDate(new Date());
+
+      const incRows = included.map(s => {
+        let subCell = '<span style="color:#565959;font-size:0.8rem;">—</span>';
+        if (s.substitutions?.length) {
+          subCell = '<ul style="margin:0;padding-left:16px;font-size:0.8rem;">' +
+            s.substitutions.map(x => `<li><code>${esc(x.token)}</code> → <strong>${esc(x.replacedWith)}</strong> (×${x.occurrences})</li>`).join('') + '</ul>';
+        }
+        return `<tr><td style="text-align:center;font-weight:700;">${esc(s.outputNumber)}</td><td style="text-align:center;color:#565959;">${esc(s.originalNumber)}</td><td>${esc(s.title)}</td><td>${subCell}</td></tr>`;
+      }).join('');
+
+      const remRows = removed.map(s =>
+        `<tr><td style="text-align:center;color:#565959;">${esc(s.originalNumber)}</td><td style="color:#565959;">${esc(s.removalReason||'Removed')}</td></tr>`
+      ).join('');
+
+      return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><title>Admin Deck Checklist — ${esc(customerName)}</title>
+<style>body{font-family:Arial,sans-serif;background:#F5F5F5;color:#0F1111;padding:0 0 48px;}
+.hdr{background:#232F3E;color:#fff;padding:20px 32px;}.bar{background:#FF9900;color:#232F3E;padding:8px 32px;font-weight:700;font-size:.875rem;display:flex;gap:24px;}
+.content{max-width:1100px;margin:24px auto;padding:0 24px;}.sec{background:#fff;border:1px solid #D5D9D9;border-radius:4px;margin-bottom:20px;overflow:hidden;}
+.sec-hdr{background:#232F3E;color:#fff;padding:10px 16px;font-size:.9rem;font-weight:700;}.sec-body{padding:16px;}
+table{width:100%;border-collapse:collapse;}th,td{padding:8px 10px;border-bottom:1px solid #D5D9D9;text-align:left;vertical-align:top;}
+tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;}</style></head><body>
+<div class="hdr"><h1 style="font-size:1.2rem;font-weight:700;">Admin Deck Checklist — ${esc(customerName)}</h1>
+<div style="font-size:.85rem;opacity:.8;margin-top:4px;">Amazon Business ProServe | Generated: ${esc(genDate)}</div></div>
+<div class="bar"><span>✅ ${included.length} slides included</span><span>❌ ${removed.length} slides removed</span></div>
+<div class="content">
+<div class="sec"><div class="sec-hdr">✅ Included Slides</div><div class="sec-body">
+<table><thead><tr style="background:#232F3E;color:#fff;"><th style="width:60px;text-align:center;">Out #</th><th style="width:70px;text-align:center;">Orig #</th><th>Title</th><th>Substitutions</th></tr></thead><tbody>${incRows}</tbody></table>
+</div></div>
+<div class="sec"><div class="sec-hdr">❌ Removed Slides</div><div class="sec-body">
+<table><thead><tr style="background:#232F3E;color:#fff;"><th style="width:80px;text-align:center;">Original #</th><th>Reason</th></tr></thead><tbody>${remRows}</tbody></table>
+</div></div></div></body></html>`;
+    }
+    return { build };
+  })();
+
+  // ── PptxPipeline ─────────────────────────────────────────────────────────────
+  const PptxPipeline = (() => {
+    function sanitize(name) { return (name||'').replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').replace(/^_+|_+$/g,''); }
+    function buildFilename(customerName) {
+      const s = sanitize(customerName) || 'Customer';
+      const d = new Date(); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+      return `Admin_Training_${s}_${y}${m}${dd}.pptx`;
+    }
+
+    async function generate(formState, arrayBuffer) {
+      try {
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const removalSet = SlideFilterEngine.computeRemovals(formState);
+        const slideManifest = await PptxManipulator.removeSlides(zip, removalSet);
+        const tokenMap = PlaceholderEngine.buildTokenMap(formState);
+        const retainedSlideFiles = slideManifest.filter(r => !r.removed).map(r => r.slideFile);
+        const substitutions = await PptxManipulator.substituteTokens(zip, tokenMap, retainedSlideFiles, formState);
+
+        // Replace BOI screenshot (Slide 13 image) if provided
+        if (formState.boiScreenshot) {
+          try {
+            const buf = await formState.boiScreenshot.arrayBuffer();
+            // Find the image file for slide 13 — we'll replace the first image on that slide
+            const s13RelsEntry = zip.file('ppt/slides/_rels/slide13.xml.rels');
+            if (s13RelsEntry) {
+              const s13Rels = await s13RelsEntry.async('text');
+              const imgMatch = s13Rels.match(/Type="[^"]*\/image"[^>]+Target="\.\.\/media\/([^"]+)"/);
+              if (imgMatch) {
+                zip.file(`ppt/media/${imgMatch[1]}`, buf);
+              }
+            }
+          } catch(e) { console.warn('BOI screenshot replacement failed:', e); }
+        }
+
+        const pptxBlob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        const checklistHtml = ChecklistGenerator.build(formState, removalSet, substitutions, slideManifest);
+        const pptxFilename = buildFilename(formState.customerName);
+        return { success: true, pptxBlob, pptxFilename, checklistHtml, previewGuideHtml: null, slideManifest, removalSet };
+      } catch(err) {
+        console.error('PptxPipeline.generate failed:', err);
+        return { success: false, error: err.message };
+      }
+    }
+    return { generate, buildFilename, sanitize };
+  })();
+
+  // ── FormController ───────────────────────────────────────────────────────────
+  const FormController = (() => {
+    function init() { _attachListeners(); _restoreState(); }
+
+    function getFormState() {
+      return {
+        sourceDeckFile: document.getElementById('source-deck-file').files[0] || null,
+        customerName: document.getElementById('customer-name').value.trim(),
+        ingressDirectAccess: document.getElementById('ingress-direct-access').checked,
+        ingressPunchout: document.getElementById('ingress-punchout').checked,
+        directAccessSso: document.querySelector('input[name="directAccessSso"]:checked')?.value === 'on',
+        punchoutSso: document.querySelector('input[name="punchoutSso"]:checked')?.value === 'on',
+        eproSystem: document.getElementById('epro-system').value,
+        eproSystemCustomName: document.getElementById('epro-custom-name').value.trim(),
+        boiScreenshot: document.getElementById('boi-screenshot').files[0] || null,
+        features: {
+          boi: document.querySelector('input[name="featureBOI"]:checked')?.value === 'yes',
+          bpo: document.querySelector('input[name="featureBPO"]:checked')?.value === 'yes',
+          bpoRecurring: document.querySelector('input[name="featureBPORecurring"]:checked')?.value === 'yes',
+          bpoIndividual: document.querySelector('input[name="featureBPOIndividual"]:checked')?.value === 'yes',
+          bpoApprovals: document.querySelector('input[name="featureBPOApprovals"]:checked')?.value === 'yes',
+          bpoNumBudgets: document.getElementById('bpo-num-budgets').value.trim(),
+          bpoNumGroups: document.getElementById('bpo-num-groups').value.trim(),
+          bpoPerBudget: document.getElementById('bpo-per-budget').value.trim(),
+          bpoPerUser: document.getElementById('bpo-per-user').value.trim(),
+          bpoBudgetPeriodStart: document.getElementById('bpo-period-start').value,
+          bpoBudgetPeriodEnd: document.getElementById('bpo-period-end').value,
+          gbRestricted: document.querySelector('input[name="featureGBRestricted"]:checked')?.value === 'yes',
+          gbBlocked: document.querySelector('input[name="featureGBBlocked"]:checked')?.value === 'yes',
+          gbPreferred: document.querySelector('input[name="featureGBPreferred"]:checked')?.value === 'yes',
+          gbAdditional: document.querySelector('input[name="featureGBAdditional"]:checked')?.value === 'yes',
+          taxExemptions: document.querySelector('input[name="featureTax"]:checked')?.value === 'yes',
+          debarment: document.querySelector('input[name="featureDebarment"]:checked')?.value === 'yes',
+          certifications: document.querySelector('input[name="featureCertifications"]:checked')?.value === 'yes',
+          approvals: document.querySelector('input[name="featureApprovals"]:checked')?.value === 'yes',
+          businessGiving: document.querySelector('input[name="featureBusinessGiving"]:checked')?.value === 'yes',
+          bgInternal: document.querySelector('input[name="featureBGInternal"]:checked')?.value === 'yes',
+          threeWayMatch: document.querySelector('input[name="feature3WM"]:checked')?.value === 'yes',
+          mobileApp: document.querySelector('input[name="featureMobileApp"]:checked')?.value === 'yes',
+        },
+        customerResourceLinks: document.getElementById('customer-resource-links').value.trim(),
+        generatePreviewGuide: document.getElementById('generate-preview-guide').checked,
+      };
+    }
+
+    function validate(fs) {
+      const errors = [];
+      if (!fs.sourceDeckFile) errors.push({ fieldId: 'source-deck-file', message: 'Source Deck PPTX file is required' });
+      if (!fs.customerName)   errors.push({ fieldId: 'customer-name',    message: 'Customer Name is required' });
+      if (!fs.ingressDirectAccess && !fs.ingressPunchout) errors.push({ fieldId: 'ingress-direct-access', message: 'At least one ingress type must be selected' });
+      if (fs.ingressPunchout && !fs.eproSystem) errors.push({ fieldId: 'epro-system', message: 'eProcurement System is required for Punchout' });
+      if (fs.ingressPunchout && fs.eproSystem === 'Custom' && !fs.eproSystemCustomName) errors.push({ fieldId: 'epro-custom-name', message: 'Custom eProcurement System Name is required' });
+      return { valid: errors.length === 0, errors };
+    }
+
+    function showValidationSummary(errors) {
+      const s = document.getElementById('validation-summary'), l = document.getElementById('validation-error-list');
+      if (!s || !l) return;
+      l.innerHTML = errors.map(e => `<li>${e.message}</li>`).join('');
+      s.classList.add('visible'); s.focus();
+    }
+
+    function clearForm() {
+      if (!confirm('Clear all form data? This cannot be undone.')) return;
+      document.getElementById('hub-form').reset();
+      StorageManager.clear();
+      _updateConditionalFields();
+      ['validation-summary','restore-banner','results-section','error-banner'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.classList.remove('visible');
+      });
+      document.getElementById('source-deck-filename').textContent = '';
+      document.getElementById('boi-screenshot-filename').textContent = '';
+      const bw = document.getElementById('boi-preview-wrap'); if (bw) bw.style.display = 'none';
+    }
+
+    function _attachListeners() {
+      const form = document.getElementById('hub-form'); if (!form) return;
+      form.addEventListener('change', _onChange);
+      form.addEventListener('input',  _onChange);
+      const fi = document.getElementById('source-deck-file');
+      if (fi) fi.addEventListener('change', () => {
+        const d = document.getElementById('source-deck-filename');
+        if (d) d.textContent = fi.files[0] ? fi.files[0].name : '';
+      });
+      // BOI screenshot preview
+      const bi = document.getElementById('boi-screenshot');
+      if (bi) bi.addEventListener('change', () => {
+        const f = bi.files[0], prev = document.getElementById('boi-preview'), wrap = document.getElementById('boi-preview-wrap'), nm = document.getElementById('boi-screenshot-filename');
+        if (f) { if (nm) nm.textContent = f.name; if (prev) prev.src = URL.createObjectURL(f); if (wrap) { wrap.style.display='flex'; wrap.style.alignItems='center'; } }
+        else { if (prev) prev.src=''; if (wrap) wrap.style.display='none'; if (nm) nm.textContent=''; }
+      });
+      const bc = document.getElementById('boi-clear-btn');
+      if (bc) bc.addEventListener('click', () => {
+        bi.value=''; const prev=document.getElementById('boi-preview'), wrap=document.getElementById('boi-preview-wrap'), nm=document.getElementById('boi-screenshot-filename');
+        if (prev) prev.src=''; if (wrap) wrap.style.display='none'; if (nm) nm.textContent='';
+      });
+    }
+
+    function _onChange() { _updateConditionalFields(); StorageManager.save(getFormState()); }
+
+    function _updateConditionalFields() {
+      const da = document.getElementById('ingress-direct-access')?.checked ?? false;
+      const po = document.getElementById('ingress-punchout')?.checked ?? false;
+      const epro = document.getElementById('epro-system')?.value ?? '';
+      const bpoYes = document.querySelector('input[name="featureBPO"]:checked')?.value === 'yes';
+      const boiYes = document.querySelector('input[name="featureBOI"]:checked')?.value === 'yes';
+      const bgYes  = document.querySelector('input[name="featureBusinessGiving"]:checked')?.value === 'yes';
+
+      _toggleBlock('da-sso-block', da);
+      _toggleBlock('po-sso-block', po);
+      _toggleField('epro-field', po);
+      _toggleField('epro-custom-field', po && epro === 'Custom');
+      _toggleWarning('punchout-mobile-warning', po);
+      _toggleSubFields('boi-sub-fields', boiYes);
+      _toggleSubFields('bpo-sub-fields', bpoYes);
+      _toggleSubFields('bg-sub-fields', bgYes);
+    }
+
+    function _toggleField(id, c)    { const e=document.getElementById(id); if(e) e.classList.toggle('visible',!!c); }
+    function _toggleBlock(id, c)    { const e=document.getElementById(id); if(e) e.classList.toggle('visible',!!c); }
+    function _toggleSubFields(id,c) { const e=document.getElementById(id); if(e) e.classList.toggle('hidden',!c); }
+    function _toggleWarning(id, c)  { const e=document.getElementById(id); if(e) e.classList.toggle('visible',!!c); }
+
+    function _restoreState() {
+      const saved = StorageManager.load();
+      if (!saved) { _updateConditionalFields(); return; }
+      const sv = (id, v) => { const e=document.getElementById(id); if(e&&v!=null) e.value=v; };
+      const sc = (id, v) => { const e=document.getElementById(id); if(e) e.checked=!!v; };
+      const sr = (name, v) => { if(v==null) return; const r=document.querySelector(`input[name="${name}"][value="${v}"]`); if(r) r.checked=true; };
+      sv('customer-name', saved.customerName);
+      sc('ingress-direct-access', saved.ingressDirectAccess);
+      sc('ingress-punchout', saved.ingressPunchout);
+      sr('directAccessSso', saved.directAccessSso ? 'on' : 'off');
+      sr('punchoutSso', saved.punchoutSso ? 'on' : 'off');
+      sv('epro-system', saved.eproSystem); sv('epro-custom-name', saved.eproSystemCustomName);
+      const f = saved.features || {};
+      sr('featureBOI', f.boi ? 'yes' : 'no');
+      sr('featureBPO', f.bpo ? 'yes' : 'no');
+      sr('featureBPORecurring', f.bpoRecurring !== false ? 'yes' : 'no');
+      sr('featureBPOIndividual', f.bpoIndividual !== false ? 'yes' : 'no');
+      sr('featureBPOApprovals', f.bpoApprovals !== false ? 'yes' : 'no');
+      sv('bpo-num-budgets', f.bpoNumBudgets); sv('bpo-num-groups', f.bpoNumGroups);
+      sv('bpo-per-budget', f.bpoPerBudget); sv('bpo-per-user', f.bpoPerUser);
+      sv('bpo-period-start', f.bpoBudgetPeriodStart); sv('bpo-period-end', f.bpoBudgetPeriodEnd);
+      sr('featureGBRestricted', f.gbRestricted ? 'yes' : 'no');
+      sr('featureGBBlocked', f.gbBlocked ? 'yes' : 'no');
+      sr('featureGBPreferred', f.gbPreferred ? 'yes' : 'no');
+      sr('featureGBAdditional', f.gbAdditional ? 'yes' : 'no');
+      sr('featureTax', f.taxExemptions !== false ? 'yes' : 'no');
+      sr('featureDebarment', f.debarment ? 'yes' : 'no');
+      sr('featureCertifications', f.certifications ? 'yes' : 'no');
+      sr('featureApprovals', f.approvals !== false ? 'yes' : 'no');
+      sr('featureBusinessGiving', f.businessGiving ? 'yes' : 'no');
+      sr('featureBGInternal', f.bgInternal ? 'yes' : 'no');
+      sr('feature3WM', f.threeWayMatch !== false ? 'yes' : 'no');
+      sr('featureMobileApp', f.mobileApp !== false ? 'yes' : 'no');
+      sv('customer-resource-links', saved.customerResourceLinks);
+      sc('generate-preview-guide', saved.generatePreviewGuide);
+      _updateConditionalFields();
+      const b = document.getElementById('restore-banner'); if (b) b.classList.add('visible');
+    }
+
+    return { init, getFormState, validate, showValidationSummary, clearForm };
+  })();
+
+  // ── Bootstrap ────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    FormController.init();
+    let _lastResult = null;
+
+    document.getElementById('clear-form-btn').addEventListener('click', () => FormController.clearForm());
+
+    const etog = document.getElementById('error-detail-toggle'), etxt = document.getElementById('error-detail-text');
+    if (etog && etxt) etog.addEventListener('click', () => {
+      const exp = etog.getAttribute('aria-expanded') === 'true';
+      etog.setAttribute('aria-expanded', String(!exp));
+      etog.textContent = exp ? 'Show technical details' : 'Hide technical details';
+      etxt.classList.toggle('visible', !exp);
+    });
+
+    const genBtn = document.getElementById('generate-btn');
+    if (genBtn) genBtn.addEventListener('click', () => {
+      const fs = FormController.getFormState();
+      const vr = FormController.validate(fs);
+      if (!vr.valid) { FormController.showValidationSummary(vr.errors); return; }
+      document.getElementById('validation-summary')?.classList.remove('visible');
+      document.getElementById('error-banner')?.classList.remove('visible');
+      genBtn.disabled = true; genBtn.innerHTML = '<span class="spinner"></span> Generating...'; genBtn.setAttribute('aria-busy','true');
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const gr = await PptxPipeline.generate(fs, e.target.result);
+          if (gr.success) {
+            _lastResult = gr;
+            DownloadHelper.downloadBlob(gr.pptxBlob, gr.pptxFilename);
+            const cc = document.getElementById('checklist-container');
+            if (cc) cc.innerHTML = `<iframe srcdoc="${gr.checklistHtml.replace(/"/g,'&quot;')}" title="Slide Checklist"></iframe>`;
+            document.getElementById('results-section')?.classList.add('visible');
+            document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else {
+            const eb = document.getElementById('error-banner'), em = document.getElementById('error-banner-message');
+            if (em) em.textContent = gr.error || 'An unexpected error occurred.';
+            if (eb) eb.classList.add('visible');
+          }
+        } catch(err) {
+          const eb = document.getElementById('error-banner'), em = document.getElementById('error-banner-message');
+          if (em) em.textContent = err.message || 'An unexpected error occurred.';
+          if (eb) eb.classList.add('visible');
+        } finally {
+          genBtn.disabled = false; genBtn.innerHTML = '⚡ Generate Deck'; genBtn.setAttribute('aria-busy','false');
+        }
+      };
+      reader.onerror = () => {
+        const eb = document.getElementById('error-banner'), em = document.getElementById('error-banner-message');
+        if (em) em.textContent = 'Failed to read the source deck file.';
+        if (eb) eb.classList.add('visible');
+        genBtn.disabled = false; genBtn.innerHTML = '⚡ Generate Deck'; genBtn.setAttribute('aria-busy','false');
+      };
+      reader.readAsArrayBuffer(fs.sourceDeckFile);
+    });
+
+    function _san(s) { return (s||'Customer').replace(/[^a-zA-Z0-9_\-]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,''); }
+    function _date() { const d=new Date(); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; }
+
+    document.getElementById('download-pptx-btn')?.addEventListener('click', () => {
+      if (!_lastResult) return;
+      DownloadHelper.downloadBlob(_lastResult.pptxBlob, _lastResult.pptxFilename);
+    });
+    document.getElementById('download-checklist-btn')?.addEventListener('click', () => {
+      if (!_lastResult) return;
+      DownloadHelper.downloadHtml(_lastResult.checklistHtml, `Admin_Checklist_${_san(FormController.getFormState().customerName)}_${_date()}.html`);
+    });
+  });
+
+  </script>
+</body>
+</html>
