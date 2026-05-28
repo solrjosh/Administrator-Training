@@ -376,11 +376,57 @@
               <label><input type="radio" name="featureGBBlocked" value="no" checked /> No</label>
             </div>
           </div>
+          <!-- Blocked Policy sub-fields (shown when Yes) -->
+          <div class="sub-fields hidden" id="gb-blocked-sub-fields">
+            <div class="field-group">
+              <label for="blocked-categories">Blocked Categories</label>
+              <textarea id="blocked-categories" name="blockedCategories"
+                placeholder="Enter each blocked category on a new line, e.g.:&#10;Laptops / 43211500&#10;Alcohol / 50202300&#10;Firearms / 46171600"
+                aria-describedby="blocked-categories-hint"
+                style="min-height:90px;"></textarea>
+              <span class="field-hint" id="blocked-categories-hint">
+                Replaces the "Name/UNSPSC" bullet items on Slide 32. Enter one category per line.
+              </span>
+            </div>
+            <div class="field-group">
+              <label for="blocked-messaging">Messaging Used</label>
+              <textarea id="blocked-messaging" name="blockedMessaging"
+                placeholder="e.g. Please contact IT for laptop acquisition."
+                aria-describedby="blocked-messaging-hint"
+                style="min-height:70px;"></textarea>
+              <span class="field-hint" id="blocked-messaging-hint">
+                Added after "Messaging Used:" on Slide 32.
+              </span>
+            </div>
+          </div>
           <div class="toggle-row">
             <span class="toggle-label" id="label-gb-preferred">Guided Buying — Preferred Products/Sellers</span>
             <div class="radio-group" role="radiogroup" aria-labelledby="label-gb-preferred">
               <label><input type="radio" name="featureGBPreferred" value="yes" /> Yes</label>
               <label><input type="radio" name="featureGBPreferred" value="no" checked /> No</label>
+            </div>
+          </div>
+          <!-- Preferred Policy sub-fields (shown when Yes) -->
+          <div class="sub-fields hidden" id="gb-preferred-sub-fields">
+            <div class="field-group">
+              <label for="preferred-items">Preferred Items</label>
+              <textarea id="preferred-items" name="preferredItems"
+                placeholder="Enter each preferred item on a new line, e.g.:&#10;AmazonCommercial Paper Towels / B07XJ8C8F5&#10;Staples Copy Paper / B00006IEJB&#10;Keurig K-Cup Pods / B00YDQFMLU"
+                aria-describedby="preferred-items-hint"
+                style="min-height:90px;"></textarea>
+              <span class="field-hint" id="preferred-items-hint">
+                Replaces the "Name/ASIN" bullet items on Slide 33. Enter one item per line (Name / ASIN).
+              </span>
+            </div>
+            <div class="field-group">
+              <label for="preferred-messaging">Messaging Used</label>
+              <textarea id="preferred-messaging" name="preferredMessaging"
+                placeholder="e.g. These items are preferred by your organization. Please consider these first."
+                aria-describedby="preferred-messaging-hint"
+                style="min-height:70px;"></textarea>
+              <span class="field-hint" id="preferred-messaging-hint">
+                Added after "Messaging Used:" on Slide 33.
+              </span>
             </div>
           </div>
           <div class="toggle-row">
@@ -474,6 +520,42 @@
             <label for="customer-resource-links">Resource Links (Slide 66)</label>
             <textarea id="customer-resource-links" name="customerResourceLinks" placeholder="Paste customer-specific resource links here (one per line)" aria-describedby="resources-hint"></textarea>
             <span class="field-hint" id="resources-hint">Replaces resource link placeholders on Slide 66.</span>
+          </div>
+
+          <!-- Spend Visibility Dashboard Screenshot (Slide 59) -->
+          <div class="field-group">
+            <label for="spend-visibility-screenshot">
+              Spend Visibility Dashboard Screenshot
+              <span style="font-weight:400;color:var(--color-text-muted);margin-left:6px;">(optional — Slide 59)</span>
+            </label>
+            <div class="file-input-wrapper">
+              <input
+                type="file"
+                id="spend-visibility-screenshot"
+                name="spendVisibilityScreenshot"
+                accept="image/png,image/jpeg,image/jpg"
+                aria-describedby="spend-vis-hint"
+              />
+              <span class="file-name-display" id="spend-vis-filename" aria-live="polite"></span>
+            </div>
+            <span class="field-hint" id="spend-vis-hint">
+              Upload a screenshot of the customer's Spend Visibility dashboard (e.g. MoM Spend by Group chart).
+              Replaces the placeholder chart image on Slide 59. PNG or JPG.
+            </span>
+            <div id="spend-vis-preview-wrap" style="display:none;margin-top:8px;">
+              <img
+                id="spend-vis-preview"
+                alt="Spend Visibility screenshot preview"
+                style="max-width:360px;max-height:130px;border:1px solid var(--color-border);border-radius:var(--radius);object-fit:contain;"
+              />
+              <button
+                type="button"
+                id="spend-vis-clear-btn"
+                class="btn btn-ghost"
+                style="margin-left:8px;padding:4px 10px;font-size:0.8rem;"
+                aria-label="Remove Spend Visibility screenshot"
+              >✕ Remove</button>
+            </div>
           </div>
         </div>
       </section>
@@ -651,20 +733,38 @@
 
       // Restricted Policy — Slide 31 category and messaging placeholders
       if (s.features.gbRestricted) {
-        // Replace the three "Name/UNSPSC" bullet placeholders with the entered categories.
-        // The CSM enters one category per line; we replace each bullet in order.
         const cats = (s.features.gbRestrictedCategories || '')
           .split('\n')
           .map(c => c.trim())
           .filter(c => c.length > 0);
-        // The slide has exactly 3 Name/UNSPSC bullets — fill what's provided, blank the rest
         map.set('Name/UNSPSC', cats[0] || '');
-        // Second and third occurrences need separate handling — done via post-processing below
-        // Store all categories for use in substituteTokens
         map.set('__RESTRICTED_CATS__', JSON.stringify(cats));
-        // Messaging Used — append the messaging text after the label
         if (s.features.gbRestrictedMessaging) {
           map.set('Messaging Used:', `Messaging Used: ${s.features.gbRestrictedMessaging}`);
+        }
+      }
+
+      // Blocked Policy — Slide 32 category and messaging placeholders
+      if (s.features.gbBlocked) {
+        const cats = (s.features.gbBlockedCategories || '')
+          .split('\n')
+          .map(c => c.trim())
+          .filter(c => c.length > 0);
+        map.set('__BLOCKED_CATS__', JSON.stringify(cats));
+        if (s.features.gbBlockedMessaging) {
+          map.set('__BLOCKED_MESSAGING__', s.features.gbBlockedMessaging);
+        }
+      }
+
+      // Preferred Policy — Slide 33 item and messaging placeholders
+      if (s.features.gbPreferred) {
+        const items = (s.features.gbPreferredItems || '')
+          .split('\n')
+          .map(i => i.trim())
+          .filter(i => i.length > 0);
+        map.set('__PREFERRED_ITEMS__', JSON.stringify(items));
+        if (s.features.gbPreferredMessaging) {
+          map.set('__PREFERRED_MESSAGING__', s.features.gbPreferredMessaging);
         }
       }
 
@@ -794,7 +894,7 @@
 
         // Token substitution
         for (const [token, value] of tokenMap) {
-          if (token === '__RESTRICTED_CATS__') continue; // handled separately below
+          if (['__RESTRICTED_CATS__','__BLOCKED_CATS__','__BLOCKED_MESSAGING__','__PREFERRED_ITEMS__','__PREFERRED_MESSAGING__'].includes(token)) continue;
           const regex = new RegExp(escapeRegex(token), 'g');
           const matches = xml.match(regex);
           const occurrences = matches ? matches.length : 0;
@@ -804,20 +904,48 @@
           }
         }
 
-        // Special handling: replace each "Name/UNSPSC" occurrence with the corresponding category
-        if (tokenMap.has('__RESTRICTED_CATS__')) {
+        const isSlide31 = filePath.includes('slide31');
+        const isSlide32 = filePath.includes('slide32');
+        const isSlide33 = filePath.includes('slide33');
+
+        // Slide 31 — Restricted: replace Name/UNSPSC bullets
+        if (isSlide31 && tokenMap.has('__RESTRICTED_CATS__')) {
           try {
             const cats = JSON.parse(tokenMap.get('__RESTRICTED_CATS__'));
-            let catIndex = 0;
-            xml = xml.replace(/Name\/UNSPSC/g, () => {
-              const replacement = cats[catIndex] || '';
-              catIndex++;
-              return escapeXml(replacement);
-            });
-            if (cats.length > 0) {
-              fileSubstitutions.push({ token: 'Name/UNSPSC', replacedWith: cats.join(', '), occurrences: Math.min(3, cats.length) });
-            }
+            let idx = 0;
+            xml = xml.replace(/Name\/UNSPSC/g, () => escapeXml(cats[idx++] || ''));
+            if (cats.length) fileSubstitutions.push({ token: 'Name/UNSPSC', replacedWith: cats.join(', '), occurrences: Math.min(3, cats.length) });
           } catch(e) {}
+        }
+
+        // Slide 32 — Blocked: replace Name/UNSPSC bullets + messaging
+        if (isSlide32 && tokenMap.has('__BLOCKED_CATS__')) {
+          try {
+            const cats = JSON.parse(tokenMap.get('__BLOCKED_CATS__'));
+            let idx = 0;
+            xml = xml.replace(/Name\/UNSPSC/g, () => escapeXml(cats[idx++] || ''));
+            if (cats.length) fileSubstitutions.push({ token: 'Name/UNSPSC', replacedWith: cats.join(', '), occurrences: Math.min(3, cats.length) });
+          } catch(e) {}
+        }
+        if (isSlide32 && tokenMap.has('__BLOCKED_MESSAGING__')) {
+          const msg = tokenMap.get('__BLOCKED_MESSAGING__');
+          xml = xml.replace(/Messaging Used:/g, escapeXml(`Messaging Used: ${msg}`));
+          fileSubstitutions.push({ token: 'Messaging Used:', replacedWith: `Messaging Used: ${msg}`, occurrences: 1 });
+        }
+
+        // Slide 33 — Preferred: replace Name/ASIN bullets + messaging
+        if (isSlide33 && tokenMap.has('__PREFERRED_ITEMS__')) {
+          try {
+            const items = JSON.parse(tokenMap.get('__PREFERRED_ITEMS__'));
+            let idx = 0;
+            xml = xml.replace(/Name\/ASIN/g, () => escapeXml(items[idx++] || ''));
+            if (items.length) fileSubstitutions.push({ token: 'Name/ASIN', replacedWith: items.join(', '), occurrences: Math.min(3, items.length) });
+          } catch(e) {}
+        }
+        if (isSlide33 && tokenMap.has('__PREFERRED_MESSAGING__')) {
+          const msg = tokenMap.get('__PREFERRED_MESSAGING__');
+          xml = xml.replace(/Messaging Used:/g, escapeXml(`Messaging Used: ${msg}`));
+          fileSubstitutions.push({ token: 'Messaging Used:', replacedWith: `Messaging Used: ${msg}`, occurrences: 1 });
         }
 
         // Orphaned separator cleanup (two passes)
@@ -926,6 +1054,22 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
           } catch(e) { console.warn('BOI screenshot replacement failed:', e); }
         }
 
+        // Replace Spend Visibility dashboard image on Slide 59 (image122.png, rId3) if provided
+        if (formState.spendVisibilityScreenshot) {
+          try {
+            const imgBuf = await formState.spendVisibilityScreenshot.arrayBuffer();
+            zip.file('ppt/media/image122.png', imgBuf);
+            if (formState.spendVisibilityScreenshot.type === 'image/jpeg') {
+              let ct = await zip.file('[Content_Types].xml').async('text');
+              ct = ct.replace(
+                /PartName="\/ppt\/media\/image122\.png"[^/]*\/>/,
+                'PartName="/ppt/media/image122.png" ContentType="image/jpeg"/>'
+              );
+              zip.file('[Content_Types].xml', ct);
+            }
+          } catch(e) { console.warn('Spend Visibility screenshot replacement failed:', e); }
+        }
+
         // Replace SSO link placeholder on Slide 27 and inject SSO screenshot if provided
         if (formState.ssoLink || formState.ssoScreenshot) {
           try {
@@ -1029,7 +1173,11 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
           gbRestrictedCategories: document.getElementById('restricted-categories').value.trim(),
           gbRestrictedMessaging: document.getElementById('restricted-messaging').value.trim(),
           gbBlocked: document.querySelector('input[name="featureGBBlocked"]:checked')?.value === 'yes',
+          gbBlockedCategories: document.getElementById('blocked-categories').value.trim(),
+          gbBlockedMessaging: document.getElementById('blocked-messaging').value.trim(),
           gbPreferred: document.querySelector('input[name="featureGBPreferred"]:checked')?.value === 'yes',
+          gbPreferredItems: document.getElementById('preferred-items').value.trim(),
+          gbPreferredMessaging: document.getElementById('preferred-messaging').value.trim(),
           gbAdditional: document.querySelector('input[name="featureGBAdditional"]:checked')?.value === 'yes',
           taxExemptions: document.querySelector('input[name="featureTax"]:checked')?.value === 'yes',
           debarment: document.querySelector('input[name="featureDebarment"]:checked')?.value === 'yes',
@@ -1041,6 +1189,7 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
           mobileApp: document.querySelector('input[name="featureMobileApp"]:checked')?.value === 'yes',
         },
         customerResourceLinks: document.getElementById('customer-resource-links').value.trim(),
+        spendVisibilityScreenshot: document.getElementById('spend-visibility-screenshot').files[0] || null,
         generatePreviewGuide: document.getElementById('generate-preview-guide').checked,
       };
     }
@@ -1073,6 +1222,10 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       document.getElementById('source-deck-filename').textContent = '';
       document.getElementById('boi-screenshot-filename').textContent = '';
       const bw = document.getElementById('boi-preview-wrap'); if (bw) bw.style.display = 'none';
+      // Clear spend visibility screenshot
+      const svInp = document.getElementById('spend-visibility-screenshot'); if (svInp) svInp.value = '';
+      const svWrap = document.getElementById('spend-vis-preview-wrap'); if (svWrap) svWrap.style.display = 'none';
+      const svNm = document.getElementById('spend-vis-filename'); if (svNm) svNm.textContent = '';
     }
 
     function _attachListeners() {
@@ -1112,7 +1265,8 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
         });
       }
       _wireImgPreview('sso-screenshot',    'sso-preview',    'sso-preview-wrap',    'sso-screenshot-filename',    'sso-clear-btn');
-      _wireImgPreview('sso-screenshot-po', 'sso-po-preview', 'sso-po-preview-wrap', 'sso-screenshot-po-filename', 'sso-po-clear-btn');    }
+      _wireImgPreview('sso-screenshot-po', 'sso-po-preview', 'sso-po-preview-wrap', 'sso-screenshot-po-filename', 'sso-po-clear-btn');
+      _wireImgPreview('spend-visibility-screenshot', 'spend-vis-preview', 'spend-vis-preview-wrap', 'spend-vis-filename', 'spend-vis-clear-btn');    }
 
     function _onChange() { _updateConditionalFields(); StorageManager.save(getFormState()); }
 
@@ -1142,6 +1296,14 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       // Restricted Policy sub-fields
       const gbRestrictedYes = document.querySelector('input[name="featureGBRestricted"]:checked')?.value === 'yes';
       _toggleSubFields('gb-restricted-sub-fields', gbRestrictedYes);
+
+      // Blocked Policy sub-fields
+      const gbBlockedYes = document.querySelector('input[name="featureGBBlocked"]:checked')?.value === 'yes';
+      _toggleSubFields('gb-blocked-sub-fields', gbBlockedYes);
+
+      // Preferred Policy sub-fields
+      const gbPreferredYes = document.querySelector('input[name="featureGBPreferred"]:checked')?.value === 'yes';
+      _toggleSubFields('gb-preferred-sub-fields', gbPreferredYes);
     }
 
     function _toggleField(id, c)    { const e=document.getElementById(id); if(e) e.classList.toggle('visible',!!c); }
@@ -1174,7 +1336,11 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       sv('restricted-categories', f.gbRestrictedCategories);
       sv('restricted-messaging',  f.gbRestrictedMessaging);
       sr('featureGBBlocked', f.gbBlocked ? 'yes' : 'no');
+      sv('blocked-categories', f.gbBlockedCategories);
+      sv('blocked-messaging',  f.gbBlockedMessaging);
       sr('featureGBPreferred', f.gbPreferred ? 'yes' : 'no');
+      sv('preferred-items',    f.gbPreferredItems);
+      sv('preferred-messaging', f.gbPreferredMessaging);
       sr('featureGBAdditional', f.gbAdditional ? 'yes' : 'no');
       sr('featureTax', f.taxExemptions !== false ? 'yes' : 'no');
       sr('featureDebarment', f.debarment ? 'yes' : 'no');
