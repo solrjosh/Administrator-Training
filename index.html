@@ -142,6 +142,40 @@
             <label for="customer-name">Customer Name <span class="required-star" aria-hidden="true">*</span></label>
             <input type="text" id="customer-name" name="customerName" placeholder="e.g. Acme Corporation" aria-required="true" autocomplete="organization" />
           </div>
+          <!-- Customer Logo (Slide 1) -->
+          <div class="field-group">
+            <label for="customer-logo">
+              Customer Logo
+              <span style="font-weight:400;color:var(--color-text-muted);margin-left:6px;">(optional — added to Slide 1)</span>
+            </label>
+            <div class="file-input-wrapper">
+              <input
+                type="file"
+                id="customer-logo"
+                name="customerLogo"
+                accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                aria-describedby="logo-hint"
+              />
+              <span class="file-name-display" id="logo-filename" aria-live="polite"></span>
+            </div>
+            <span class="field-hint" id="logo-hint">
+              Upload the customer's logo. It will be placed in the top-right corner of the title slide. PNG, JPG, or SVG recommended.
+            </span>
+            <div id="logo-preview-wrap" style="display:none;margin-top:8px;">
+              <img
+                id="logo-preview"
+                alt="Customer logo preview"
+                style="max-width:200px;max-height:80px;border:1px solid var(--color-border);border-radius:var(--radius);object-fit:contain;background:#fff;padding:4px;"
+              />
+              <button
+                type="button"
+                id="logo-clear-btn"
+                class="btn btn-ghost"
+                style="margin-left:8px;padding:4px 10px;font-size:0.8rem;"
+                aria-label="Remove customer logo"
+              >✕ Remove</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -696,10 +730,21 @@
         map.set('{{Customer}}', s.customerName);
         map.set('{{CUSTOMER}}', s.customerName);
         map.set('[CUSTOMER]', s.customerName);
+        // Also map without spaces in case the split-run merger produces a variant
+        map.set('{{ Customer}}', s.customerName);
+        map.set('{{Customer }}', s.customerName);
       }
 
       // Remove internal-only markers
       map.set('[INTERNAL CAMPAIGNS ONLY]', '');
+
+      // SSO link — replace <inert link> placeholder on slide 27
+      // The token is stored as &lt;inert link&gt; in the XML (HTML-encoded angle brackets)
+      // We add it to the token map so it gets replaced during the main substitution pass.
+      if (s.ssoLink) {
+        map.set('&lt;inert link&gt;', s.ssoLink);
+        map.set('<inert link>', s.ssoLink);
+      }
 
       // BPO slide 18 literal text replacement
       if (s.features.bpo) {
@@ -779,7 +824,7 @@
     function save(fs) {
       clearTimeout(_t);
       _t = setTimeout(() => {
-        try { const { sourceDeckFile, boiScreenshot, ...p } = fs; localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch(e) {}
+        try { const { sourceDeckFile, boiScreenshot, customerLogo, ssoScreenshot, ssoScreenshotPo, spendVisibilityScreenshot, ...p } = fs; localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch(e) {}
       }, 300);
     }
     function load() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch(e) { return null; } }
@@ -881,8 +926,56 @@
         let xml = await zipEntry.async('text');
         const fileSubstitutions = [];
 
-        // Remove yellow label shapes (FFFF00)
-        xml = xml.replace(/<p:sp>[\s\S]*?<\/p:sp>/g, shape => shape.includes('FFFF00') ? '' : shape);
+        // ── Split-run token repair ──────────────────────────────────────────────
+        // PowerPoint sometimes splits tokens like {{ Customer }} across multiple
+        // <a:r> runs: run1="{{", run2="Customer", run3="}}".
+        // Fix: scan consecutive runs and merge only those whose combined text forms
+        // a {{...}} token. Other runs are left untouched to preserve spacing/formatting.
+        xml = xml.replace(/(<a:p[^>]*>)([\s\S]*?)(<\/a:p>)/g, (fullPara, pOpen, pBody, pClose) => {
+          // Extract all runs with their full XML and text content
+          const runMatches = [];
+          const runPat = /<a:r>([\s\S]*?)<\/a:r>/g;
+          let rm;
+          while ((rm = runPat.exec(pBody)) !== null) {
+            const tMatch = rm[1].match(/<a:t[^>]*>([^<]*)<\/a:t>/);
+            runMatches.push({ full: rm[0], text: tMatch ? tMatch[1] : '', index: rm.index });
+          }
+
+          if (runMatches.length < 2) return fullPara;
+
+          // Look for consecutive runs whose combined text contains {{ ... }}
+          let newBody = pBody;
+          for (let i = 0; i < runMatches.length - 1; i++) {
+            // Try combining runs i..j until we find a complete {{...}} token
+            for (let j = i + 1; j < Math.min(i + 5, runMatches.length); j++) {
+              const combined = runMatches.slice(i, j + 1).map(r => r.text).join('');
+              if (/^\{\{[^}]+\}\}$/.test(combined.trim())) {
+                // Found a split token spanning runs i..j — merge just those runs
+                const firstRPr = runMatches[i].full.match(/<a:rPr[\s\S]*?(?:\/>|<\/a:rPr>)/)?.[0] || '<a:rPr lang="en-US" dirty="0"/>';
+                const mergedRun = `<a:r>${firstRPr}<a:t>${combined.trim()}</a:t></a:r>`;
+                // Replace the original runs i..j with the merged run in the XML
+                const toReplace = runMatches.slice(i, j + 1).map(r => r.full).join('');
+                newBody = newBody.replace(toReplace, mergedRun);
+                break;
+              }
+            }
+          }
+          return pOpen + newBody + pClose;
+        });
+
+        // Remove yellow label shapes (FFFF00) and red-bordered authoring note boxes (FF0000)
+        xml = xml.replace(/<p:sp>[\s\S]*?<\/p:sp>/g, (shape) => {
+          // Remove yellow-filled label badges
+          if (shape.includes('FFFF00')) return '';
+          // Remove red-bordered authoring note boxes that contain DO & DELETE / DELETE IF notes
+          if (shape.includes('FF0000')) {
+            const shapeText = (shape.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || [])
+              .map(t => t.replace(/<[^>]+>/g, '')).join(' ');
+            const isAuthoringNote = /DO\s*&(?:amp;)?\s*DELETE|DELETE\s*IF|DELETE:\s*IF|REMOVE\s*IF|PUNCHOUT\s*ONLY|REPLACE\s*WITH|Update\s*(image|screenshot)|Adjust\s*top/i.test(shapeText);
+            if (isAuthoringNote) return '';
+          }
+          return shape;
+        });
 
         // Paragraph-level removal
         for (const marker of removeParagraphsContaining) {
@@ -1070,6 +1163,55 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
           } catch(e) { console.warn('Spend Visibility screenshot replacement failed:', e); }
         }
 
+        // Add customer logo to Slide 1 (title slide) if provided
+        // Since slide 1 has no existing images, we inject a new picture shape into the slide XML.
+        if (formState.customerLogo) {
+          try {
+            const logoFile = formState.customerLogo;
+            const logoBuf  = await logoFile.arrayBuffer();
+            const logoExt  = logoFile.type === 'image/jpeg' ? 'jpg'
+                           : logoFile.type === 'image/svg+xml' ? 'svg'
+                           : 'png';
+            const logoFilename = `customer_logo.${logoExt}`;
+            const logoPath     = `ppt/media/${logoFilename}`;
+
+            // Add image to ZIP
+            zip.file(logoPath, logoBuf);
+
+            // Register content type
+            let ct = await zip.file('[Content_Types].xml').async('text');
+            const mimeMap = { jpg: 'image/jpeg', png: 'image/png', svg: 'image/svg+xml' };
+            if (!ct.includes(logoFilename)) {
+              ct = ct.replace('</Types>',
+                `<Default Extension="${logoExt}" ContentType="${mimeMap[logoExt] || 'image/png'}"/></Types>`);
+              zip.file('[Content_Types].xml', ct);
+            }
+
+            // Add relationship to slide 1
+            const s1RelsPath = 'ppt/slides/_rels/slide1.xml.rels';
+            let s1Rels = await zip.file(s1RelsPath).async('text');
+            const logoRId = 'rId98';
+            s1Rels = s1Rels.replace('</Relationships>',
+              `<Relationship Id="${logoRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${logoFilename}"/></Relationships>`);
+            zip.file(s1RelsPath, s1Rels);
+
+            // Insert picture shape into slide 1 — top-right corner, ~1.5" wide
+            // EMU: 1 inch = 914400. Slide width = 12192000 (13.33"). Logo: 1371600 wide (1.5"), 685800 tall (0.75")
+            const logoW = 1371600, logoH = 685800;
+            const logoX = 12192000 - logoW - 228600; // right-aligned with 0.25" margin
+            const logoY = 228600; // 0.25" from top
+            const picShape = `<p:pic xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+              `<p:nvPicPr><p:cNvPr id="98" name="Customer Logo"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
+              `<p:blipFill><a:blip r:embed="${logoRId}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
+              `<p:spPr><a:xfrm><a:off x="${logoX}" y="${logoY}"/><a:ext cx="${logoW}" cy="${logoH}"/></a:xfrm>` +
+              `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+
+            let s1Xml = await zip.file('ppt/slides/slide1.xml').async('text');
+            s1Xml = s1Xml.replace('</p:spTree>', picShape + '</p:spTree>');
+            zip.file('ppt/slides/slide1.xml', s1Xml);
+          } catch(e) { console.warn('Customer logo injection failed:', e); }
+        }
+
         // Replace SSO link placeholder on Slide 27 and inject SSO screenshot if provided
         if (formState.ssoLink || formState.ssoScreenshot) {
           try {
@@ -1079,9 +1221,11 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
               let s27Xml = await s27Entry.async('text');
 
               // Replace <inert link> with the SSO URL (stored as &lt;inert link&gt; in XML)
+              // The URL is XML-escaped for safe insertion into the XML text content.
               if (formState.ssoLink) {
-                s27Xml = s27Xml.replace(/&lt;inert link&gt;/g, PptxManipulator.escapeXml(formState.ssoLink));
-                s27Xml = s27Xml.replace(/<inert link>/g, PptxManipulator.escapeXml(formState.ssoLink));
+                const escapedUrl = PptxManipulator.escapeXml(formState.ssoLink);
+                s27Xml = s27Xml.replace(/&lt;inert link&gt;/gi, escapedUrl);
+                s27Xml = s27Xml.replace(/&lt;inert\s+link&gt;/gi, escapedUrl);
               }
 
               // Remove the "or Screenshot" text since we're injecting the actual screenshot
@@ -1155,6 +1299,7 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
         eproSystem: document.getElementById('epro-system').value,
         eproSystemCustomName: document.getElementById('epro-custom-name').value.trim(),
         boiScreenshot: document.getElementById('boi-screenshot').files[0] || null,
+        customerLogo: document.getElementById('customer-logo').files[0] || null,
         ssoLink: document.getElementById('sso-link').value.trim() || document.getElementById('sso-link-po').value.trim(),
         ssoScreenshot: document.getElementById('sso-screenshot').files[0] || document.getElementById('sso-screenshot-po').files[0] || null,
         features: {
@@ -1226,6 +1371,10 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       const svInp = document.getElementById('spend-visibility-screenshot'); if (svInp) svInp.value = '';
       const svWrap = document.getElementById('spend-vis-preview-wrap'); if (svWrap) svWrap.style.display = 'none';
       const svNm = document.getElementById('spend-vis-filename'); if (svNm) svNm.textContent = '';
+      // Clear customer logo
+      const logoInp = document.getElementById('customer-logo'); if (logoInp) logoInp.value = '';
+      const logoWrap = document.getElementById('logo-preview-wrap'); if (logoWrap) logoWrap.style.display = 'none';
+      const logoNm = document.getElementById('logo-filename'); if (logoNm) logoNm.textContent = '';
     }
 
     function _attachListeners() {
@@ -1266,7 +1415,8 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       }
       _wireImgPreview('sso-screenshot',    'sso-preview',    'sso-preview-wrap',    'sso-screenshot-filename',    'sso-clear-btn');
       _wireImgPreview('sso-screenshot-po', 'sso-po-preview', 'sso-po-preview-wrap', 'sso-screenshot-po-filename', 'sso-po-clear-btn');
-      _wireImgPreview('spend-visibility-screenshot', 'spend-vis-preview', 'spend-vis-preview-wrap', 'spend-vis-filename', 'spend-vis-clear-btn');    }
+      _wireImgPreview('spend-visibility-screenshot', 'spend-vis-preview', 'spend-vis-preview-wrap', 'spend-vis-filename', 'spend-vis-clear-btn');
+      _wireImgPreview('customer-logo', 'logo-preview', 'logo-preview-wrap', 'logo-filename', 'logo-clear-btn');    }
 
     function _onChange() { _updateConditionalFields(); StorageManager.save(getFormState()); }
 
@@ -1326,9 +1476,9 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       const f = saved.features || {};
       sr('featureBOI', f.boi ? 'yes' : 'no');
       sr('featureBPO', f.bpo ? 'yes' : 'no');
-      sr('featureBPORecurring', f.bpoRecurring !== false ? 'yes' : 'no');
-      sr('featureBPOIndividual', f.bpoIndividual !== false ? 'yes' : 'no');
-      sr('featureBPOApprovals', f.bpoApprovals !== false ? 'yes' : 'no');
+      sr('featureBPORecurring', f.bpoRecurring === true ? 'yes' : 'no');
+      sr('featureBPOIndividual', f.bpoIndividual === true ? 'yes' : 'no');
+      sr('featureBPOApprovals', f.bpoApprovals === true ? 'yes' : 'no');
       sv('bpo-num-budgets', f.bpoNumBudgets); sv('bpo-num-groups', f.bpoNumGroups);
       sv('bpo-per-budget', f.bpoPerBudget); sv('bpo-per-user', f.bpoPerUser);
       sv('bpo-period-start', f.bpoBudgetPeriodStart); sv('bpo-period-end', f.bpoBudgetPeriodEnd);
@@ -1342,14 +1492,14 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
       sv('preferred-items',    f.gbPreferredItems);
       sv('preferred-messaging', f.gbPreferredMessaging);
       sr('featureGBAdditional', f.gbAdditional ? 'yes' : 'no');
-      sr('featureTax', f.taxExemptions !== false ? 'yes' : 'no');
+      sr('featureTax', f.taxExemptions === true ? 'yes' : 'no');
       sr('featureDebarment', f.debarment ? 'yes' : 'no');
       sr('featureCertifications', f.certifications ? 'yes' : 'no');
-      sr('featureApprovals', f.approvals !== false ? 'yes' : 'no');
+      sr('featureApprovals', f.approvals === true ? 'yes' : 'no');
       sr('featureBusinessGiving', f.businessGiving ? 'yes' : 'no');
       sr('featureBGInternal', f.bgInternal ? 'yes' : 'no');
-      sr('feature3WM', f.threeWayMatch !== false ? 'yes' : 'no');
-      sr('featureMobileApp', f.mobileApp !== false ? 'yes' : 'no');
+      sr('feature3WM', f.threeWayMatch === true ? 'yes' : 'no');
+      sr('featureMobileApp', f.mobileApp === true ? 'yes' : 'no');
       sv('customer-resource-links', saved.customerResourceLinks);
       sc('generate-preview-guide', saved.generatePreviewGuide);
       _updateConditionalFields();
