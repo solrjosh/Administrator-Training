@@ -718,6 +718,70 @@
     return { computeRemovals };
   })();
 
+  // ── NotesDrivenFilterEngine (shared with Requisitioner hub) ─────────────────
+  // See full documentation in the Requisitioner hub or the tag format guide below.
+  // Add [HUB:REMOVE-IF:...] tags to slide speaker notes in PowerPoint to make
+  // slide removal rules version-agnostic.
+  const NotesDrivenFilterEngine = (() => {
+    async function extractNoteConditions(zip, orderedSlideFiles) {
+      const conditionMap = new Map();
+      for (let i = 0; i < orderedSlideFiles.length; i++) {
+        const slideFile = orderedSlideFiles[i];
+        const slideBasename = slideFile.replace(/^ppt\/slides\//, '').replace(/\.xml$/, '');
+        const relsPath = `ppt/slides/_rels/${slideBasename}.xml.rels`;
+        const relsEntry = zip.file(relsPath); if (!relsEntry) continue;
+        const relsXml = await relsEntry.async('text');
+        const notesMatch = relsXml.match(/notesSlides\/(notesSlide\d+\.xml)/); if (!notesMatch) continue;
+        const notesEntry = zip.file(`ppt/notesSlides/${notesMatch[1]}`); if (!notesEntry) continue;
+        const notesXml = await notesEntry.async('text');
+        const notesText = (notesXml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join(' ');
+        const conditions = [];
+        const tagPat = /\[HUB:REMOVE-IF:([^\]]+)\]/gi; let tm;
+        while ((tm = tagPat.exec(notesText)) !== null) conditions.push(tm[1].trim().toLowerCase());
+        if (conditions.length > 0) conditionMap.set(slideFile, conditions);
+      }
+      return conditionMap;
+    }
+
+    function evaluateCondition(condition, s) {
+      const hasPunchout = !!s.ingressPunchout, hasDA = !!s.ingressDirectAccess;
+      const ssoInUse = (hasDA && s.directAccessSso) || (hasPunchout && s.punchoutSso);
+      if (condition === 'ingress!=punchout')        return !hasPunchout;
+      if (condition === 'ingress!=direct-access')   return !hasDA;
+      if (condition === 'ingress=punchout-only')    return hasPunchout && !hasDA;
+      if (condition === 'ingress=direct-access-only') return hasDA && !hasPunchout;
+      if (condition === 'punchout-only=true')       return !(hasPunchout && !hasDA);
+      if (condition === 'sso=false')                return !ssoInUse;
+      if (condition === 'sso=true')                 return ssoInUse;
+      if (condition === 'da-sso=false')             return !(hasDA && s.directAccessSso);
+      if (condition === 'punchout-sso=false')       return !(hasPunchout && s.punchoutSso);
+      if (condition === 'epro!=coupa')              return s.eproSystem !== 'Coupa';
+      if (condition === 'epro!=ariba')              return s.eproSystem !== 'Ariba';
+      if (condition === 'epro=coupa')               return s.eproSystem === 'Coupa';
+      if (condition === 'epro=ariba')               return s.eproSystem === 'Ariba';
+      if (condition === 'epro=custom')              return s.eproSystem === 'Custom';
+      const fm = condition.match(/^feature\.([a-zA-Z]+)=(true|false)$/);
+      if (fm) {
+        const featureIsOn = !!(s.features && s.features[fm[1]]);
+        return fm[2] === 'false' ? !featureIsOn : featureIsOn;
+      }
+      console.warn(`[HUB] Unknown condition: "${condition}"`);
+      return false;
+    }
+
+    function computeRemovals(conditionMap, formState, orderedSlideFiles) {
+      const rs = new Set();
+      for (const [sf, conditions] of conditionMap) {
+        if (conditions.every(c => evaluateCondition(c, formState))) {
+          const idx = orderedSlideFiles.indexOf(sf);
+          if (idx >= 0) rs.add(idx + 1);
+        }
+      }
+      return rs;
+    }
+    return { extractNoteConditions, computeRemovals, evaluateCondition };
+  })();
+
   // ── PlaceholderEngine ────────────────────────────────────────────────────────
   const PlaceholderEngine = (() => {
     function buildTokenMap(formState) {
@@ -929,44 +993,64 @@
         // ── Split-run token repair ──────────────────────────────────────────────
         // PowerPoint sometimes splits tokens like {{ Customer }} across multiple
         // <a:r> runs: run1="{{", run2="Customer", run3="}}".
-        // Fix: scan consecutive runs and merge only those whose combined text forms
-        // a {{...}} token. Other runs are left untouched to preserve spacing/formatting.
-        xml = xml.replace(/(<a:p[^>]*>)([\s\S]*?)(<\/a:p>)/g, (fullPara, pOpen, pBody, pClose) => {
-          // Extract all runs with their full XML and text content
-          const runMatches = [];
-          const runPat = /<a:r>([\s\S]*?)<\/a:r>/g;
-          let rm;
-          while ((rm = runPat.exec(pBody)) !== null) {
-            const tMatch = rm[1].match(/<a:t[^>]*>([^<]*)<\/a:t>/);
-            runMatches.push({ full: rm[0], text: tMatch ? tMatch[1] : '', index: rm.index });
-          }
+        // Fix: only process paragraphs that actually contain a split token.
+        // We detect this by checking if the paragraph's combined run text contains
+        // {{ }} but no individual run contains a complete {{ }} token.
+        // We then merge ONLY the specific consecutive runs that form the token.
+        if (/\{\{/.test(xml)) {
+          xml = xml.replace(/(<a:p[^>]*>)([\s\S]*?)(<\/a:p>)/g, (fullPara, pOpen, pBody, pClose) => {
+            // Quick check: does this paragraph have any {{ at all?
+            if (!pBody.includes('{{') && !pBody.includes('&lt;')) return fullPara;
 
-          if (runMatches.length < 2) return fullPara;
+            // Extract all runs
+            const runMatches = [];
+            const runPat = /<a:r>([\s\S]*?)<\/a:r>/g;
+            let rm;
+            while ((rm = runPat.exec(pBody)) !== null) {
+              const tMatch = rm[1].match(/<a:t[^>]*>([^<]*)<\/a:t>/);
+              runMatches.push({ full: rm[0], text: tMatch ? tMatch[1] : '' });
+            }
 
-          // Look for consecutive runs whose combined text contains {{ ... }}
-          let newBody = pBody;
-          for (let i = 0; i < runMatches.length - 1; i++) {
-            // Try combining runs i..j until we find a complete {{...}} token
-            for (let j = i + 1; j < Math.min(i + 5, runMatches.length); j++) {
-              const combined = runMatches.slice(i, j + 1).map(r => r.text).join('');
-              if (/^\{\{[^}]+\}\}$/.test(combined.trim())) {
-                // Found a split token spanning runs i..j — merge just those runs
-                const firstRPr = runMatches[i].full.match(/<a:rPr[\s\S]*?(?:\/>|<\/a:rPr>)/)?.[0] || '<a:rPr lang="en-US" dirty="0"/>';
-                const mergedRun = `<a:r>${firstRPr}<a:t>${combined.trim()}</a:t></a:r>`;
-                // Replace the original runs i..j with the merged run in the XML
-                const toReplace = runMatches.slice(i, j + 1).map(r => r.full).join('');
-                newBody = newBody.replace(toReplace, mergedRun);
-                break;
+            if (runMatches.length < 2) return fullPara;
+
+            // Check if any individual run already has a complete {{ }} token
+            const hasCompleteToken = runMatches.some(r => /\{\{[^}]+\}\}/.test(r.text));
+            if (hasCompleteToken) return fullPara; // no repair needed
+
+            // Check if combined text has a token that no individual run has
+            const combinedText = runMatches.map(r => r.text).join('');
+            if (!/\{\{[^}]+\}\}/.test(combinedText)) return fullPara; // no split token
+
+            // Find and merge only the specific runs that form the split token
+            let newBody = pBody;
+            for (let i = 0; i < runMatches.length - 1; i++) {
+              for (let j = i + 1; j < Math.min(i + 6, runMatches.length); j++) {
+                const slice = runMatches.slice(i, j + 1);
+                const sliceText = slice.map(r => r.text).join('');
+                // Must be EXACTLY a token (trimmed), nothing else
+                if (/^\s*\{\{[^}]+\}\}\s*$/.test(sliceText)) {
+                  const tokenText = sliceText.trim();
+                  const firstRPr = slice[0].full.match(/<a:rPr[\s\S]*?(?:\/>|<\/a:rPr>)/)?.[0]
+                                || '<a:rPr lang="en-US" dirty="0"/>';
+                  const mergedRun = `<a:r>${firstRPr}<a:t>${tokenText}</a:t></a:r>`;
+                  const toReplace = slice.map(r => r.full).join('');
+                  // Only replace the first occurrence to avoid double-replacing
+                  newBody = newBody.replace(toReplace, mergedRun);
+                  break;
+                }
               }
             }
-          }
-          return pOpen + newBody + pClose;
-        });
+            return pOpen + newBody + pClose;
+          });
+        }
 
-        // Remove yellow label shapes (FFFF00) and red-bordered authoring note boxes (FF0000)
+        // Remove yellow label shapes (FFFF00 as shape fill) and red-bordered authoring note boxes (FF0000)
+        // IMPORTANT: Only remove shapes where FFFF00 is a shape fill (in <p:spPr>),
+        // NOT where it's a text highlight (<a:highlight>) — that would remove content shapes.
         xml = xml.replace(/<p:sp>[\s\S]*?<\/p:sp>/g, (shape) => {
-          // Remove yellow-filled label badges
-          if (shape.includes('FFFF00')) return '';
+          // Check for yellow fill only within the shape properties section
+          const spPr = shape.match(/<p:spPr>[\s\S]*?<\/p:spPr>/)?.[0] || '';
+          if (spPr.includes('FFFF00')) return '';
           // Remove red-bordered authoring note boxes that contain DO & DELETE / DELETE IF notes
           if (shape.includes('FF0000')) {
             const shapeText = (shape.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || [])
@@ -1125,7 +1209,24 @@ tr:last-child td{border-bottom:none;}code{font-family:monospace;font-size:.85em;
     async function generate(formState, arrayBuffer) {
       try {
         const zip = await JSZip.loadAsync(arrayBuffer);
-        const removalSet = SlideFilterEngine.computeRemovals(formState);
+
+        // Parse slide order for notes-driven filtering
+        const presXml2 = await zip.file('ppt/presentation.xml').async('text');
+        const rels2    = await zip.file('ppt/_rels/presentation.xml.rels').async('text');
+        const rIds2 = []; const sp2 = /<p:sldId[^>]+r:id="([^"]+)"/g; let sm4;
+        while ((sm4 = sp2.exec(presXml2)) !== null) rIds2.push(sm4[1]);
+        const r2f2 = {}; const rp2 = /<Relationship[^>]+Id="([^"]+)"[^>]+Type="[^"]*\/slide"[^>]+Target="([^"]+)"[^>]*\/?>/g; let rm4;
+        while ((rm4 = rp2.exec(rels2)) !== null) {
+          let t3 = rm4[2]; if (t3.startsWith('../')) t3 = 'ppt/' + t3.slice(3); else if (!t3.startsWith('ppt/')) t3 = 'ppt/' + t3;
+          r2f2[rm4[1]] = t3;
+        }
+        const osfn = rIds2.map(r => r2f2[r]).filter(Boolean);
+
+        const hardcodedRemovals2 = SlideFilterEngine.computeRemovals(formState);
+        const conditionMap2 = await NotesDrivenFilterEngine.extractNoteConditions(zip, osfn);
+        const notesDrivenRemovals2 = NotesDrivenFilterEngine.computeRemovals(conditionMap2, formState, osfn);
+        const removalSet = new Set([...hardcodedRemovals2, ...notesDrivenRemovals2]);
+        console.log(`[HUB Admin] Removals — hardcoded: ${hardcodedRemovals2.size}, notes: ${notesDrivenRemovals2.size}, total: ${removalSet.size}`);
         const slideManifest = await PptxManipulator.removeSlides(zip, removalSet);
         const tokenMap = PlaceholderEngine.buildTokenMap(formState);
         const retainedSlideFiles = slideManifest.filter(r => !r.removed).map(r => r.slideFile);
